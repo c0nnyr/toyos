@@ -5,3 +5,6 @@
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
 }
+
+#[no_mangle]
+fn _start() {}
