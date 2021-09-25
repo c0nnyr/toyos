@@ -12,3 +12,9 @@ clean:
 	@rm -f $(KERNEL_ELF) $(KERNEL_ELF).o $(KERNEL_BIN)
 disasm:
 	@riscv64-unknown-elf-objdump -sS $(KERNEL_ELF)
+debug1:
+	@echo start running qemu
+	@qemu-system-riscv64  -machine virt -nographic -bios $(BIOS_BIN) -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_MAIN_PHY_ADDR) -s -S
+debug2:
+	@riscv64-unknown-elf-gdb -ex 'target remote localhost:1234' -ex 'break *$(KERNEL_MAIN_PHY_ADDR)' -ex 'x /16i $(KERNEL_MAIN_PHY_ADDR)' -ex 'c'
+	
