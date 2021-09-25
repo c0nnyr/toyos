@@ -4,6 +4,7 @@ SECTIONS
 {
     . = KERNEL_MAIN_PHY_ADDR; # 表示这个地方地址是KERNEL_MAIN_PHY_ADDR
     .text : {  # 都归在.text段
+        *(.text._start) #_start需要在最前面，这样就能正确从_start启动了
         *(.text .text.*) # 表示所有.text和.text.*这些段，0个或者多个。 下面那些同理
     }
     # 为啥要对齐？因为我们是64位的，CPU在加载数据的时候都是8字节对齐，所以我们得要求数据段都是8字节对齐的。

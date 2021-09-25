@@ -1,5 +1,8 @@
 #![no_std]
 #![no_main]
+#![feature(global_asm)]
+
+global_asm!(include_str!("main.asm"));
 
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
@@ -7,7 +10,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[no_mangle]
-fn _start() -> ! {
+fn main() -> ! {
     let s = "Hello, world!";
     for ch in s.chars() {
         print_char(ch);
@@ -16,5 +19,12 @@ fn _start() -> ! {
 }
 
 fn print_char(ch: char) {
-    //TODO print a characture
+    ecall(1 as usize, ch as usize, 0, 0);
+}
+
+fn ecall(ecall_id: usize, a0: usize, a1: usize, a2: usize) -> usize {
+    extern "C" {
+        fn ecall_asm(a0: usize, a1: usize, a2: usize, a3: usize) -> usize;
+    }
+    unsafe { ecall_asm(a0, a1, a2, ecall_id) }
 }
