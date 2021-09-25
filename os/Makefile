@@ -5,7 +5,7 @@ KERNEL_BIN := $(KERNEL_ELF).bin
 BIOS_BIN := ../bios/rustsbi_qemu.bin # BIOS
 KERNEL_MAIN_PHY_ADDR := 0x80200000 # BIOS默认跳转到这里
 build: clean
-	@cargo build --target $(TARGET) --release
+	@RUSTFLAGS='-Clink-arg=-Tlinker.ld' cargo build --target $(TARGET) --release
 	@riscv64-unknown-elf-objcopy $(KERNEL_ELF) -S -O binary $(KERNEL_BIN)   # 生成镜像
 run: build
 	@qemu-system-riscv64  -machine virt -nographic -bios $(BIOS_BIN) -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_MAIN_PHY_ADDR)
@@ -18,4 +18,3 @@ debug1:
 	@qemu-system-riscv64  -machine virt -nographic -bios $(BIOS_BIN) -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_MAIN_PHY_ADDR) -s -S
 debug2:
 	@riscv64-unknown-elf-gdb -ex 'target remote localhost:1234' -ex 'break *$(KERNEL_MAIN_PHY_ADDR)' -ex 'x /16i $(KERNEL_MAIN_PHY_ADDR)' -ex 'c'
-	
