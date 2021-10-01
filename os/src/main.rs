@@ -2,11 +2,6 @@
 #![no_main]
 #![feature(global_asm)]
 
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
-}
-
 #[no_mangle]
 fn main() -> ! {
     kprint!("Hello, world! {}. Score {}", "Tom", 100);
@@ -16,3 +11,4 @@ fn main() -> ! {
 #[macro_use]
 mod io; //出现在早点的位置，这样后面的模块就可以直接使用宏了;
 mod arch;
+mod panic;
