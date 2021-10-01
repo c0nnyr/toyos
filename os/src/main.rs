@@ -2,8 +2,6 @@
 #![no_main]
 #![feature(global_asm)]
 
-global_asm!(include_str!("main.asm"));
-
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
