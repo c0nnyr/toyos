@@ -30,7 +30,8 @@ fn main() -> ! {
 }
 
 fn print_char(ch: char) {
-    arch::riscv::ecall::ecall(1 as usize, ch as usize, 0, 0);
+    ecall(1 as usize, ch as usize, 0, 0);
 }
 
 mod arch;
+use arch::ecall::ecall;
