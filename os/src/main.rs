@@ -7,7 +7,10 @@ fn main() -> ! {
     log::logger::LOGGER
         .lock()
         .init(log::logger::Level::Info, log::logger::LoggerType::SerialIO);
+    kdebug!("Hello, world! {}. Score {}", "Tom", 100);
     kinfo!("Hello, world! {}. Score {}", "Tom", 100);
+    kwarn!("Hello, world! {}. Score {}", "Tom", 100);
+    kerror!("Hello, world! {}. Score {}", "Tom", 100);
     loop {} //避免代码往下走走到了未知的指令
 }
 

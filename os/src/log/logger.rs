@@ -1,5 +1,6 @@
 use crate::io::serial_io::SerialIO; //引入SerialIO，SerialIO是我们目前的主要打印日志方式
 use spin::Mutex;
+#[derive(core::cmp::PartialOrd, core::cmp::PartialEq)]
 pub enum Level {
     //日志分级枚举
     Debug = 1,
@@ -24,6 +25,34 @@ impl Logger {
             LoggerType::DummyWriter => self.dummy_writer = Some(DummyWriter {}),
             LoggerType::SerialIO => self.serial_io_writer = Some(SerialIO {}),
         };
+    }
+    pub fn should_log(&self, level: &Level) -> bool {
+        level >= &self.min_level
+    }
+    pub fn get_fmt_prefix(&self, level: &Level) -> &'static str {
+        match self.type_ {
+            LoggerType::DummyWriter => match level {
+                &Level::Debug => "KDebug:",
+                &Level::Info => "KInfo:",
+                &Level::Warn => "KWarn:",
+                &Level::Error => "KError:",
+                &Level::Never => "KNever:",
+            },
+            LoggerType::SerialIO => match level {
+                &Level::Debug => "\x1b[90mKDebug:", //灰色
+                &Level::Info => "\x1b[34mKInfo:",   //蓝色
+                &Level::Warn => "\x1b[32mKWarn:",   //黄色
+                &Level::Error => "\x1b[31mKError:", //红色
+                &Level::Never => "KNever:",         //不应该到这里
+            },
+        }
+    }
+
+    pub fn get_fmt_suffix(&self, _level: &Level) -> &'static str {
+        match self.type_ {
+            LoggerType::DummyWriter => "",
+            LoggerType::SerialIO => "\x1b[0m",
+        }
     }
 }
 
