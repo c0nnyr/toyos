@@ -10,5 +10,7 @@ fn main() -> ! {
 
 #[macro_use]
 mod io; //出现在早点的位置，这样后面的模块就可以直接使用宏了;
+#[macro_use]
+mod log; //出现在早点的位置，这样后面的模块就可以直接使用宏了;
 mod arch;
 mod panic;
