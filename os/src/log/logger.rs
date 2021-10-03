@@ -16,6 +16,24 @@ pub struct Logger {
     serial_io_writer: Option<SerialIO>,
 }
 
+impl core::fmt::Write for Logger {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        match self.type_ {
+            //枚举具体的logger类型，使用具体的writer来打印
+            LoggerType::DummyWriter => match &mut self.dummy_writer {
+                //枚举所有writer的可能，非空情况下才真正打印
+                Some(writer) => writer.write_str(s),
+                None => Ok(()),
+            },
+            LoggerType::SerialIO => match &mut self.serial_io_writer {
+                //枚举所有writer的可能，非空情况下才真正打印
+                Some(writer) => writer.write_str(s),
+                None => Ok(()),
+            },
+        }
+    }
+}
+
 struct DummyWriter {} //空的Writer
 impl core::fmt::Write for DummyWriter {
     fn write_str(&mut self, _s: &str) -> core::fmt::Result {
