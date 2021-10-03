@@ -16,6 +16,17 @@ pub struct Logger {
     serial_io_writer: Option<SerialIO>,
 }
 
+impl Logger {
+    pub fn init(&mut self, min_level: Level, type_: LoggerType) {
+        self.min_level = min_level;
+        self.type_ = type_;
+        match self.type_ {
+            LoggerType::DummyWriter => self.dummy_writer = Some(DummyWriter {}),
+            LoggerType::SerialIO => self.serial_io_writer = Some(SerialIO {}),
+        };
+    }
+}
+
 impl core::fmt::Write for Logger {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         match self.type_ {
