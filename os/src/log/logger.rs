@@ -1,5 +1,5 @@
 use crate::io::serial_io::SerialIO; //引入SerialIO，SerialIO是我们目前的主要打印日志方式
-
+use spin::Mutex;
 pub enum Level {
     //日志分级枚举
     Debug = 1,
@@ -46,3 +46,10 @@ pub enum LoggerType {
     DummyWriter,
     SerialIO,
 }
+
+pub static LOGGER: Mutex<Logger> = Mutex::new(Logger {
+    min_level: Level::Never,
+    type_: LoggerType::DummyWriter,
+    dummy_writer: Some(DummyWriter {}),
+    serial_io_writer: None,
+});
