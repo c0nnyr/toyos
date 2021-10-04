@@ -11,7 +11,7 @@ fn main() -> ! {
     kinfo!("Hello, world! {}. Score {}", "Tom", 100);
     kwarn!("Hello, world! {}. Score {}", "Tom", 100);
     kerror!("Hello, world! {}. Score {}", "Tom", 100);
-    loop {} //避免代码往下走走到了未知的指令
+    arch::ecall::shutdown();
 }
 
 #[macro_use]
