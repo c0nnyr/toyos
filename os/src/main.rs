@@ -15,7 +15,10 @@ fn main() {
 }
 #[no_mangle]
 fn trap_entry() {
-    kinfo!("trap entry");
+    kinfo!(
+        "trap entry {:?}", //打印Debug Trait生成的信息，比较丰富
+        arch::trap::TrapCause::get_current_cause()
+    );
 }
 
 #[macro_use]
