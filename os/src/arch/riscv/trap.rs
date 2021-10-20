@@ -19,6 +19,10 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
         self.ctx[32] = pc; //x32就是sepc
     }
 
+    fn mv_pc_to_next(&mut self) {
+        self.ctx[32] += 4; //仅用于syscall场景，触发syscall的ecall指令是4字节长度
+    }
+
     fn restore_trap(&self) -> ! {
         //根据自己保存的上下文恢复到用户态
         extern "C" {
@@ -64,6 +68,6 @@ pub fn init() {
 }
 
 #[no_mangle]
-fn trap_entry(ctx: &TrapContextStoreImpl) {
-    trap::dispatch_trap(&trap::TrapContext::new(ctx));
+fn trap_entry(ctx: &mut TrapContextStoreImpl) {
+    *ctx = *trap::dispatch_trap(&mut trap::TrapContext::new(ctx)).raw();
 }

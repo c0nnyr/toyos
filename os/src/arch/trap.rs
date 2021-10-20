@@ -34,6 +34,7 @@ impl TrapCause {
 pub trait TrapContextStore: Default {
     fn set_sp(&mut self, sp: u64);
     fn set_pc(&mut self, pc: u64);
+    fn mv_pc_to_next(&mut self);
     fn restore_trap(&self) -> !;
     fn get_syscall_param(&self) -> syscall::SyscallParam;
 }
@@ -48,6 +49,9 @@ impl TrapContextStore for TrapContext {
     }
     fn set_pc(&mut self, pc: u64) {
         self.store.set_pc(pc)
+    }
+    fn mv_pc_to_next(&mut self) {
+        self.store.mv_pc_to_next()
     }
     fn restore_trap(&self) -> ! {
         self.store.restore_trap()
@@ -69,13 +73,16 @@ impl TrapContext {
     pub fn new(store: &trap::TrapContextStoreImpl) -> Self {
         TrapContext { store: *store }
     }
+    pub fn raw(&self) -> &trap::TrapContextStoreImpl {
+        &self.store
+    }
 }
 
 pub fn init() {
     trap::init();
 }
 
-pub fn dispatch_trap(ctx: &TrapContext) {
+pub fn dispatch_trap(ctx: &mut TrapContext) -> &mut TrapContext {
     let cause = TrapCause::get_current_cause();
     kinfo!("trap entry with cause {:?}", cause);
     match cause {
@@ -83,7 +90,7 @@ pub fn dispatch_trap(ctx: &TrapContext) {
             Exception::Syscall => {
                 let syscall_param = ctx.get_syscall_param();
                 ecall::putchar_serialio(syscall_param.params[0] as u8 as char);
-                // kinfo!("handling syscall");
+                ctx.mv_pc_to_next();
             }
             Exception::Unsupported(v) => {
                 panic!("Unsupported trap exception {:?}", v);
@@ -95,4 +102,5 @@ pub fn dispatch_trap(ctx: &TrapContext) {
             }
         },
     }
+    ctx
 }
