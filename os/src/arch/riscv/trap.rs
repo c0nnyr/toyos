@@ -1,3 +1,4 @@
+use crate::arch::syscall;
 use crate::arch::trap;
 global_asm!(include_str!("trap.asm"));
 
@@ -24,6 +25,19 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
             fn restore_trap_asm(ctx: &TrapContextStoreImpl) -> !;
         }
         unsafe { restore_trap_asm(self) }
+    }
+
+    fn get_syscall_param(&self) -> syscall::SyscallParam {
+        syscall::SyscallParam {
+            params: [
+                //使用a0~a3作为参数
+                self.ctx[10] as usize,
+                self.ctx[11] as usize,
+                self.ctx[12] as usize,
+                self.ctx[13] as usize,
+            ],
+            syscall_id: syscall::SyscallId::from(self.ctx[17] as usize), //使用a7作为syscall id，传统而已，无所谓
+        }
     }
 }
 impl Default for TrapContextStoreImpl {

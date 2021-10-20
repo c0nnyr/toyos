@@ -1,5 +1,9 @@
+use crate::arch::ecall;
+use crate::arch::syscall;
+
 use super::riscv::register;
 use super::riscv::trap;
+
 #[derive(Debug)] //方便打印
 pub enum Exception {
     Syscall,
@@ -31,6 +35,7 @@ pub trait TrapContextStore: Default {
     fn set_sp(&mut self, sp: u64);
     fn set_pc(&mut self, pc: u64);
     fn restore_trap(&self) -> !;
+    fn get_syscall_param(&self) -> syscall::SyscallParam;
 }
 
 pub struct TrapContext {
@@ -46,6 +51,9 @@ impl TrapContextStore for TrapContext {
     }
     fn restore_trap(&self) -> ! {
         self.store.restore_trap()
+    }
+    fn get_syscall_param(&self) -> syscall::SyscallParam {
+        self.store.get_syscall_param()
     }
 }
 
