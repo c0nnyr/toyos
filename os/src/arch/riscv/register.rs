@@ -36,7 +36,10 @@ impl trap::TrapCauseLoader for TrapCauseLoaderImpl {
         if v.is_interrupt() {
             trap::TrapCause::Interrupt(trap::Interrupt::Unsupported(v.get_code()))
         } else {
-            trap::TrapCause::Exeption(trap::Exception::Unsupported(v.get_code()))
+            match v.get_code() {
+                8 => trap::TrapCause::Exeption(trap::Exception::Syscall),
+                _ => trap::TrapCause::Exeption(trap::Exception::Unsupported(v.get_code())),
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ use super::riscv::register;
 use super::riscv::trap;
 #[derive(Debug)] //方便打印
 pub enum Exception {
+    Syscall,
     Unsupported(usize), //暂时不对具体的cause做区分，将所有的信息都放在这里面
 }
 #[derive(Debug)]
@@ -71,6 +72,9 @@ pub fn dispatch_trap(ctx: &TrapContext) {
     kinfo!("trap entry with cause {:?}", cause);
     match cause {
         TrapCause::Exeption(v) => match v {
+            Exception::Syscall => {
+                kinfo!("handling syscall");
+            }
             Exception::Unsupported(v) => {
                 panic!("Unsupported trap exception {:?}", v);
             }
