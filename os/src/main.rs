@@ -2,6 +2,8 @@
 #![no_main]
 #![feature(global_asm)]
 
+use crate::arch::trap::TrapContextStore;
+
 #[no_mangle]
 fn main() {
     log::logger::LOGGER
@@ -11,7 +13,15 @@ fn main() {
     kinfo!("Hello, world! {}. Score {}", "Tom", 100);
     kwarn!("Hello, world! {}. Score {}", "Tom", 100);
     kerror!("Hello, world! {}. Score {}", "Tom", 100);
-    // arch::ecall::shutdown();
+    let mut ctx = arch::trap::TrapContext::default();
+    ctx.set_sp(USER_STACK.as_ptr() as u64 + USER_STACK.len() as u64);
+    ctx.set_pc(user_entry as u64);
+    ctx.restore_trap();
+}
+static USER_STACK: [u8; 1024] = [0; 1024];
+#[no_mangle]
+fn user_entry() {
+    arch::ecall::putchar_serialio('H');
 }
 #[no_mangle]
 fn trap_entry() {

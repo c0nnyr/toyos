@@ -6,12 +6,6 @@ _start:
     call main # 伪指令，等价于auipc计算一下跳转的地方，jalr跳转一下
     la t0, trap_entry_asm
     csrw stvec, t0
-    la t0, test_ecall_asm # 地址立即数比较大，需要用la来加载到寄存器
-    csrw sepc, t0
-    sret
-test_ecall_asm:
-    ecall
-    ret
     .balign 8
 trap_entry_asm:
     call trap_entry
