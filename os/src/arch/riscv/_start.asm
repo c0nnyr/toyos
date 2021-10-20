@@ -2,10 +2,10 @@
     .section .text._start
     .globl _start # 必须要，符号要导出去
 _start:
-    la sp, boot_kernal_stack_end_asm # 赋值，栈是从高地址到低地址的
-    call main # 伪指令，等价于auipc计算一下跳转的地方，jalr跳转一下
     la t0, trap_entry_asm
     csrw stvec, t0
+    la sp, boot_kernal_stack_end_asm # 赋值，栈是从高地址到低地址的
+    call main # 伪指令，等价于auipc计算一下跳转的地方，jalr跳转一下
     .balign 8
 trap_entry_asm:
     call trap_entry
