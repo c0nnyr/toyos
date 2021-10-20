@@ -81,7 +81,9 @@ pub fn dispatch_trap(ctx: &TrapContext) {
     match cause {
         TrapCause::Exeption(v) => match v {
             Exception::Syscall => {
-                kinfo!("handling syscall");
+                let syscall_param = ctx.get_syscall_param();
+                ecall::putchar_serialio(syscall_param.params[0] as u8 as char);
+                // kinfo!("handling syscall");
             }
             Exception::Unsupported(v) => {
                 panic!("Unsupported trap exception {:?}", v);
