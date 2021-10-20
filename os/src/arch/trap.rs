@@ -55,3 +55,7 @@ impl Default for TrapContext {
         }
     }
 }
+
+pub fn init() {
+    trap::init();
+}

@@ -1,6 +1,7 @@
 use crate::arch::trap;
 global_asm!(include_str!("trap.asm"));
 
+#[repr(C)]
 pub struct TrapContextStoreImpl {
     //需要保存32寄存器，以及sepc
     //x0..=x32, sepc，一共33个
@@ -28,4 +29,29 @@ impl Default for TrapContextStoreImpl {
     fn default() -> Self {
         TrapContextStoreImpl { ctx: [0; 33] }
     }
+}
+
+pub fn init() {
+    extern "C" {
+        fn init_trap_entry_asm();
+        fn trap_context_asm();
+        fn trap_context_end_asm();
+    }
+    //校验一下TrapContextStore的大小
+    if core::mem::size_of::<TrapContextStoreImpl>()
+        != (trap_context_end_asm as usize - trap_context_asm as usize)
+    {
+        panic!("TrapContextStore size not equal");
+    }
+    unsafe {
+        init_trap_entry_asm();
+    }
+}
+
+#[no_mangle]
+fn trap_entry() {
+    kinfo!(
+        "trap entry {:?}",
+        crate::arch::trap::TrapCause::get_current_cause()
+    );
 }
