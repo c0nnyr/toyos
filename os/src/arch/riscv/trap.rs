@@ -2,6 +2,7 @@ use crate::arch::trap;
 global_asm!(include_str!("trap.asm"));
 
 #[repr(C)]
+#[derive(Copy, Clone)] //这样就能正常拷贝了。Copy+Clone说明使用=的时候，不是使用move语义转移所有权，而是拷贝一份
 pub struct TrapContextStoreImpl {
     //需要保存32寄存器，以及sepc
     //x0..=x32, sepc，一共33个
@@ -49,9 +50,6 @@ pub fn init() {
 }
 
 #[no_mangle]
-fn trap_entry() {
-    kinfo!(
-        "trap entry {:?}",
-        crate::arch::trap::TrapCause::get_current_cause()
-    );
+fn trap_entry(ctx: &TrapContextStoreImpl) {
+    trap::dispatch_trap(&trap::TrapContext::new(ctx));
 }

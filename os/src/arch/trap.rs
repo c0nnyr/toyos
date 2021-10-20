@@ -56,6 +56,29 @@ impl Default for TrapContext {
     }
 }
 
+impl TrapContext {
+    pub fn new(store: &trap::TrapContextStoreImpl) -> Self {
+        TrapContext { store: *store }
+    }
+}
+
 pub fn init() {
     trap::init();
+}
+
+pub fn dispatch_trap(ctx: &TrapContext) {
+    let cause = TrapCause::get_current_cause();
+    kinfo!("trap entry with cause {:?}", cause);
+    match cause {
+        TrapCause::Exeption(v) => match v {
+            Exception::Unsupported(v) => {
+                panic!("Unsupported trap exception {:?}", v);
+            }
+        },
+        TrapCause::Interrupt(v) => match v {
+            Interrupt::Unsupported(v) => {
+                panic!("Unsupported trap interrupt {:?}", v);
+            }
+        },
+    }
 }

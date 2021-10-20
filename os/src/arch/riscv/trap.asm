@@ -12,7 +12,8 @@ enter_trap_asm:
     sd x30, 32*8(x31) 
 
     la x2, boot_kernal_stack_end_asm# sp=x2，直接用boot的栈作为这里的内核栈，因为到这里，boot的栈已经不会再用了。
-    # fn ()
+    # fn (&TrapContextStore)
+    la x10, trap_context_asm # 设置参数用于消费上下文
     call trap_entry 
     la x10, trap_context_asm # 设置参数用于恢复上下文
     call restore_trap_asm 
