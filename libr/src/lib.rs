@@ -13,6 +13,7 @@ pub fn _start() {
     main(); // TODO 应该有个退出机制
 }
 
+#[no_mangle]
 #[linkage = "weak"]
 fn main() -> usize {
     panic!("never here");
