@@ -16,14 +16,10 @@ fn main() {
     kerror!("Hello, world! {}. Score {}", "Tom", 100);
     let mut ctx = arch::trap::TrapContext::default();
     ctx.set_sp(USER_STACK.as_ptr() as u64 + USER_STACK.len() as u64);
-    ctx.set_pc(user_entry as u64);
+    ctx.set_pc(0x80400000);
     ctx.restore_trap();
 }
 static USER_STACK: [u8; 1024] = [0; 1024];
-#[no_mangle]
-fn user_entry() {
-    arch::ecall::putchar_serialio('H');
-}
 #[macro_use]
 mod io; //出现在早点的位置，这样后面的模块就可以直接使用宏了;
 #[macro_use]
