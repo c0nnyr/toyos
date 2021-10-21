@@ -6,11 +6,12 @@ mod arch;
 #[macro_use]
 pub mod io;
 mod panic;
+pub mod system;
 
 #[no_mangle]
 #[link_section = ".text._start"]
 pub fn _start() {
-    main(); // TODO 应该有个退出机制
+    system::exit(main());
 }
 
 #[no_mangle]
