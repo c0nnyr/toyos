@@ -43,6 +43,9 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
             syscall_id: syscall::SyscallId::from(self.ctx[17] as usize), //使用a7作为syscall id，传统而已，无所谓
         }
     }
+    fn set_syscall_return_code(&mut self, code: usize) {
+        self.ctx[10] = code as u64;
+    }
 }
 impl Default for TrapContextStoreImpl {
     fn default() -> Self {

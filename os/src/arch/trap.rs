@@ -37,6 +37,7 @@ pub trait TrapContextStore: Default {
     fn mv_pc_to_next(&mut self);
     fn restore_trap(&self) -> !;
     fn get_syscall_param(&self) -> syscall::SyscallParam;
+    fn set_syscall_return_code(&mut self, code: usize);
 }
 
 pub struct TrapContext {
@@ -58,6 +59,9 @@ impl TrapContextStore for TrapContext {
     }
     fn get_syscall_param(&self) -> syscall::SyscallParam {
         self.store.get_syscall_param()
+    }
+    fn set_syscall_return_code(&mut self, code: usize) {
+        self.store.set_syscall_return_code(code)
     }
 }
 
@@ -84,12 +88,12 @@ pub fn init() {
 
 pub fn dispatch_trap(ctx: &mut TrapContext) -> &mut TrapContext {
     let cause = TrapCause::get_current_cause();
-    kinfo!("trap entry with cause {:?}", cause);
     match cause {
         TrapCause::Exeption(v) => match v {
             Exception::Syscall => {
                 let syscall_param = ctx.get_syscall_param();
-                ecall::putchar_serialio(syscall_param.params[0] as u8 as char);
+                let return_code = syscall_param.dispatch_syscall();
+                ctx.set_syscall_return_code(return_code);
                 ctx.mv_pc_to_next();
             }
             Exception::Unsupported(v) => {
