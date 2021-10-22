@@ -11,7 +11,8 @@ build: clean
 run: build
 	@qemu-system-riscv64  -machine virt -nographic -bios $(BIOS_BIN) \
 	-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_MAIN_PHY_ADDR) \
-	-device loader,file=../app/$(TARGET_DIR)/$(TARGET)/release/hello_world.bin,addr=0x80400000
+	-device loader,addr=0x80400000,data=0x1,data-len=4 \
+	-device loader,file=../app/$(TARGET_DIR)/$(TARGET)/release/hello_world.bin,addr=0x80500000
 clean:
 	@rm -rf $(TARGET_DIR) $(KERNEL_ELF) $(KERNEL_ELF).o $(KERNEL_BIN)
 disasm:
