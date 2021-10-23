@@ -11,6 +11,9 @@ fn main() -> ! {
     kinfo!("Hello, world! {}. Score {}", "Tom", 100);
     kwarn!("Hello, world! {}. Score {}", "Tom", 100);
     kerror!("Hello, world! {}. Score {}", "Tom", 100);
+    for app in app::APPS {
+        app();
+    }
     arch::ecall::shutdown();
 }
 
@@ -18,5 +21,6 @@ fn main() -> ! {
 mod io; //出现在早点的位置，这样后面的模块就可以直接使用宏了;
 #[macro_use]
 mod log; //出现在早点的位置，这样后面的模块就可以直接使用宏了;
+mod app;
 mod arch;
 mod panic;
