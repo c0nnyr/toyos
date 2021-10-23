@@ -1,3 +1,4 @@
+use super::config;
 use crate::arch::trap;
 global_asm!(include_str!("register.asm"));
 
@@ -41,5 +42,27 @@ impl trap::TrapCauseLoader for TrapCauseLoaderImpl {
                 _ => trap::TrapCause::Exeption(trap::Exception::Unsupported(v.get_code())),
             }
         }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct Time {
+    pub bits: usize,
+}
+
+impl Time {
+    pub fn load() -> Self {
+        extern "C" {
+            fn load_time_asm() -> usize;
+        }
+        unsafe {
+            Time {
+                bits: load_time_asm(),
+            }
+        }
+    }
+
+    pub fn as_duration(&self) -> core::time::Duration {
+        core::time::Duration::from_millis((self.bits / config::CLOCKS_PER_MS) as u64)
     }
 }

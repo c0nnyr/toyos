@@ -1,5 +1,8 @@
 use super::task;
-use crate::arch::trap::{self, TrapContext, TrapContextStore};
+use crate::arch::{
+    time,
+    trap::{self, TrapContext, TrapContextStore},
+};
 
 pub const MAX_TASK_NUM: usize = 100; //最大支持的TASK数量
 pub const MAX_TASK_SIZE: usize = 0x100000; //TASK包体的最大尺寸，1M
@@ -40,7 +43,11 @@ impl TaskManager {
         match &self.tasks[idx] {
             //避免拷贝，所以才加上个&
             Some(task) => {
-                kinfo!("==============================LoadingTask {}", idx);
+                kinfo!(
+                    "==============================LoadingTask {} at {:?}.",
+                    idx,
+                    time::get_now()
+                );
                 let code = task.get_code();
                 unsafe {
                     let dst: &mut [u8] =//这里需要的是一个可变的数组引用，也同样是不安全的
