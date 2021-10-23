@@ -34,13 +34,13 @@ impl TaskManager {
 
     //Rust里面的错误，本质上也是个泛型枚举。这里我们的()是数据的类型，静态生命周期字符串引用&'static str（也就是字符串常量）是错误的类型
     fn load_task_code(&self, idx: usize) -> Result<(), &'static str> {
-        kinfo!("==============================\nLoadingTask {}", idx);
         if idx >= MAX_TASK_NUM {
             return Err("idx exceed max task num");
         }
         match &self.tasks[idx] {
             //避免拷贝，所以才加上个&
             Some(task) => {
+                kinfo!("==============================\nLoadingTask {}", idx);
                 let code = task.get_code();
                 unsafe {
                     let dst: &mut [u8] =//这里需要的是一个可变的数组引用，也同样是不安全的
@@ -67,6 +67,10 @@ impl TaskManager {
         ctx.set_sp(USER_STACK.as_ptr() as u64 + USER_STACK.len() as u64);
         ctx.set_pc(TASK_RUNNING_ADDR as u64);
         ctx
+    }
+
+    pub fn get_current_idx(&self) -> usize {
+        self.current_idx
     }
 }
 

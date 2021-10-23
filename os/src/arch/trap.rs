@@ -40,6 +40,7 @@ pub trait TrapContextStore: Default {
     fn set_syscall_return_code(&mut self, code: usize);
 }
 
+#[derive(Clone, Copy)]
 pub struct TrapContext {
     store: trap::TrapContextStoreImpl,
 }
@@ -86,25 +87,52 @@ pub fn init() {
     trap::init();
 }
 
-pub fn dispatch_trap(ctx: &mut TrapContext) -> &mut TrapContext {
+fn build_next_trap_context() -> TrapContext {
+    let mut task_manager = crate::task::task_manager::TASK_MANAGER.lock();
+    let current_idx = task_manager.get_current_idx();
+    match task_manager.switch_to_task(current_idx + 1) {
+        Ok(_) => task_manager.get_default_trap_context(),
+        Err(_) => {
+            kinfo!("Legacy shutdown now!"); //没有更多应用了
+            ecall::shutdown();
+        }
+    }
+}
+
+pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
     let cause = TrapCause::get_current_cause();
     match cause {
         TrapCause::Exeption(v) => match v {
             Exception::Syscall => {
                 let syscall_param = ctx.get_syscall_param();
-                let return_code = syscall_param.dispatch_syscall();
-                ctx.set_syscall_return_code(return_code);
-                ctx.mv_pc_to_next();
+                match syscall_param.syscall_id {
+                    syscall::SyscallId::Exit => {
+                        kinfo!("Task exiting.");
+                        build_next_trap_context()
+                    }
+                    syscall::SyscallId::Unsupported(v) => {
+                        kerror!("Unsupported syscall {}.", v);
+                        build_next_trap_context()
+                    }
+                    _ => {
+                        let return_code = syscall_param.dispatch_syscall();
+                        let mut ctx = *ctx; //拷贝一份，注意这里需要给TrapContext增加Copy/Clone
+                        ctx.set_syscall_return_code(return_code);
+                        ctx.mv_pc_to_next();
+                        ctx
+                    }
+                }
             }
             Exception::Unsupported(v) => {
-                panic!("Unsupported trap exception {:?}", v);
+                kerror!("Unsupported trap exception {:?}", v);
+                build_next_trap_context()
             }
         },
         TrapCause::Interrupt(v) => match v {
             Interrupt::Unsupported(v) => {
-                panic!("Unsupported trap interrupt {:?}", v);
+                kerror!("Unsupported trap interrupt {:?}", v);
+                build_next_trap_context()
             }
         },
     }
-    ctx
 }

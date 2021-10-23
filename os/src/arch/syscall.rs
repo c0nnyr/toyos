@@ -24,13 +24,12 @@ impl From<usize> for SyscallId {
 impl SyscallParam {
     pub fn dispatch_syscall(&self) -> usize {
         match self.syscall_id {
-            SyscallId::Exit => {
-                kinfo!("exit, shutdown now"); //TODO temporary
-                ecall::shutdown();
-            }
             SyscallId::Putchar => ecall::putchar_serialio(self.params[0] as u8 as char),
+            SyscallId::Exit => {
+                panic!("never here"); //外面处理
+            }
             SyscallId::Unsupported(v) => {
-                panic!("unsupported syscall {}", v); //TODO temporary
+                panic!("never here"); //外面处理
             }
         }
     }
