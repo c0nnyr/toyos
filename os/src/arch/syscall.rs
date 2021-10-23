@@ -25,10 +25,7 @@ impl SyscallParam {
     pub fn dispatch_syscall(&self) -> usize {
         match self.syscall_id {
             SyscallId::Putchar => ecall::putchar_serialio(self.params[0] as u8 as char),
-            SyscallId::Exit => {
-                panic!("never here"); //外面处理
-            }
-            SyscallId::Unsupported(v) => {
+            SyscallId::Exit | SyscallId::Unsupported(_) => {
                 panic!("never here"); //外面处理
             }
         }

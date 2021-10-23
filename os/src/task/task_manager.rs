@@ -40,7 +40,7 @@ impl TaskManager {
         match &self.tasks[idx] {
             //避免拷贝，所以才加上个&
             Some(task) => {
-                kinfo!("==============================\nLoadingTask {}", idx);
+                kinfo!("==============================LoadingTask {}", idx);
                 let code = task.get_code();
                 unsafe {
                     let dst: &mut [u8] =//这里需要的是一个可变的数组引用，也同样是不安全的
