@@ -1,8 +1,10 @@
 use super::ecall;
+use super::time;
 
 pub enum SyscallId {
     Putchar,
     Exit,
+    GetNow,
     Unsupported(usize),
 }
 
@@ -16,6 +18,7 @@ impl From<usize> for SyscallId {
         match v {
             1 => SyscallId::Putchar,
             2 => SyscallId::Exit,
+            3 => SyscallId::GetNow,
             _ => SyscallId::Unsupported(v),
         }
     }
@@ -25,6 +28,7 @@ impl SyscallParam {
     pub fn dispatch_syscall(&self) -> usize {
         match self.syscall_id {
             SyscallId::Putchar => ecall::putchar_serialio(self.params[0] as u8 as char),
+            SyscallId::GetNow => time::get_now().as_millis() as usize,
             SyscallId::Exit | SyscallId::Unsupported(_) => {
                 panic!("never here"); //外面处理
             }
