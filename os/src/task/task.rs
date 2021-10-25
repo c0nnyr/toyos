@@ -1,14 +1,23 @@
+use crate::arch::trap::{self, TrapContextStore}; //引入TrapContextStore才能使用TrapContext身上对这个trait的实现
+
 #[derive(Clone, Copy)]
 pub struct Task {
     start_addr: usize,
     end_addr: usize,
+    trap_context: trap::TrapContext,
 }
 
 impl Task {
-    pub fn new(start_addr: usize, end_addr: usize) -> Self {
+    pub fn new(start_addr: usize, end_addr: usize, stack_bottom: usize) -> Self {
         Task {
             start_addr,
             end_addr,
+            trap_context: { //初始化为这个task最初应该的样子
+                let mut ctx = trap::TrapContext::default();
+                ctx.set_sp(stack_bottom as u64);
+                ctx.set_pc(super::task_manager::TASK_RUNNING_ADDR as u64);
+                ctx
+            },
         }
     }
 
@@ -21,5 +30,9 @@ impl Task {
                 self.end_addr - self.start_addr,
             )
         }
+    }
+
+    pub fn get_trap_context(&self) -> trap::TrapContext {
+        self.trap_context
     }
 }

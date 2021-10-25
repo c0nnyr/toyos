@@ -91,7 +91,7 @@ fn build_next_trap_context() -> TrapContext {
     let mut task_manager = crate::task::task_manager::TASK_MANAGER.lock();
     let current_idx = task_manager.get_current_idx();
     match task_manager.switch_to_task(current_idx + 1) {
-        Ok(_) => task_manager.get_default_trap_context(),
+        Ok(_) => task_manager.get_current_trap_context(),
         Err(_) => {
             kinfo!("Legacy shutdown now!"); //没有更多应用了
             ecall::shutdown();

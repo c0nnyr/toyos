@@ -1,8 +1,5 @@
 use super::task;
-use crate::arch::{
-    time,
-    trap::{self, TrapContext, TrapContextStore},
-};
+use crate::arch::{time, trap};
 
 pub const MAX_TASK_NUM: usize = 100; //最大支持的TASK数量
 pub const MAX_TASK_SIZE: usize = 0x100000; //TASK包体的最大尺寸，1M
@@ -31,6 +28,7 @@ impl TaskManager {
             self.tasks[i] = Some(task::Task::new(
                 TASK_RUNNING_ADDR + (i + 1) * MAX_TASK_SIZE,
                 TASK_RUNNING_ADDR + (i + 2) * MAX_TASK_SIZE,
+                USER_STACK.as_ptr() as usize + USER_STACK.len(),
             ));
         }
     }
@@ -69,11 +67,11 @@ impl TaskManager {
         Ok(())
     }
 
-    pub fn get_default_trap_context(&self) -> TrapContext {
-        let mut ctx = trap::TrapContext::default();
-        ctx.set_sp(USER_STACK.as_ptr() as u64 + USER_STACK.len() as u64);
-        ctx.set_pc(TASK_RUNNING_ADDR as u64);
-        ctx
+    pub fn get_current_trap_context(&self) -> trap::TrapContext {
+        match &self.tasks[self.current_idx] {
+            Some(task) => task.get_trap_context(),
+            None => panic!("never here"),
+        }
     }
 
     pub fn get_current_idx(&self) -> usize {
