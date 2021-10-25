@@ -4,6 +4,7 @@ enum SyscallId {
     Putchar = 1,
     Exit = 2,
     GetNow = 3,
+    Reschedule = 4,
 }
 
 fn _syscall(a0: usize, a1: usize, a2: usize, a3: usize, syscall_id: SyscallId) -> usize {
@@ -24,4 +25,9 @@ pub fn get_now() -> core::time::Duration {
     //获取当前时间
     let ms = _syscall(0, 0, 0, 0, SyscallId::GetNow);
     core::time::Duration::from_millis(ms as u64)
+}
+
+pub fn reschedule() -> usize {
+    //重新调度
+    _syscall(0, 0, 0, 0, SyscallId::Reschedule)
 }

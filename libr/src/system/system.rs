@@ -13,3 +13,7 @@ pub fn sleep(duration: core::time::Duration) {
     let wakeup_time = get_now() + duration;
     while get_now() < wakeup_time {}
 }
+
+pub fn reschedule() -> usize {
+    syscall::reschedule()
+}
