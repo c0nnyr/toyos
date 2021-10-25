@@ -92,7 +92,7 @@ pub fn init() {
 fn build_next_trap_context() -> TrapContext {
     let mut task_manager = task_manager::TASK_MANAGER.lock();
     let current_idx = task_manager.get_current_idx();
-    match task_manager.switch_to_task(current_idx + 1) {
+    match task_manager.switch_to_next_task(current_idx + 1) {
         Ok(_) => task_manager.get_current_trap_context(),
         Err(_) => {
             kinfo!("Legacy shutdown now!"); //没有更多应用了
@@ -105,6 +105,11 @@ pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
     let cause = TrapCause::get_current_cause();
     let set_current_task_state = |state: task::TaskState| { //使用闭包，及时将task_manager的lock释放。
         task_manager::TASK_MANAGER.lock().set_current_state(state);
+    };
+    let save_current_trap_context = |ctx: &TrapContext| {
+        task_manager::TASK_MANAGER
+            .lock()
+            .save_current_trap_context(ctx);
     };
     match cause {
         TrapCause::Exeption(v) => match v {
@@ -119,6 +124,13 @@ pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
                     syscall::SyscallId::Unsupported(v) => {
                         kerror!("Unsupported syscall {}.", v);
                         set_current_task_state(task::TaskState::Stopped);
+                        build_next_trap_context()
+                    }
+                    syscall::SyscallId::Reschedule => {
+                        kinfo!("Rescheduling");
+                        let mut ctx = *ctx; //复制一份才能修改
+                        ctx.mv_pc_to_next(); //回到用户态需要执行下一条指令，否则就循环reschedule了。类似putchar这些syscall
+                        save_current_trap_context(&ctx);
                         build_next_trap_context()
                     }
                     _ => {

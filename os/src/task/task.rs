@@ -1,6 +1,6 @@
 use crate::arch::trap::{self, TrapContextStore}; //引入TrapContextStore才能使用TrapContext身上对这个trait的实现
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum TaskState {
     Init,
     Running,
@@ -45,7 +45,15 @@ impl Task {
         self.trap_context
     }
 
+    pub fn save_trap_context(&mut self, ctx: &trap::TrapContext) {
+        self.trap_context = *ctx;
+    }
+
     pub fn set_state(&mut self, state: TaskState) {
         self.state = state;
+    }
+
+    pub fn is_runnable(&self)->bool{
+        self.state == TaskState::Init || self.state == TaskState::Running
     }
 }

@@ -5,6 +5,7 @@ pub enum SyscallId {
     Putchar,
     Exit,
     GetNow,
+    Reschedule,
     Unsupported(usize),
 }
 
@@ -19,6 +20,7 @@ impl From<usize> for SyscallId {
             1 => SyscallId::Putchar,
             2 => SyscallId::Exit,
             3 => SyscallId::GetNow,
+            4 => SyscallId::Reschedule,
             _ => SyscallId::Unsupported(v),
         }
     }
@@ -29,7 +31,7 @@ impl SyscallParam {
         match self.syscall_id {
             SyscallId::Putchar => ecall::putchar_serialio(self.params[0] as u8 as char),
             SyscallId::GetNow => time::get_now().as_millis() as usize,
-            SyscallId::Exit | SyscallId::Unsupported(_) => {
+            SyscallId::Reschedule | SyscallId::Exit | SyscallId::Unsupported(_) => {
                 panic!("never here"); //外面处理
             }
         }

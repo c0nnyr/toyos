@@ -69,6 +69,25 @@ impl TaskManager {
         Ok(())
     }
 
+    pub fn switch_to_next_task(&mut self, from_idx: usize) -> Result<(), &'static str> {
+        for i in 0..MAX_TASK_NUM {
+            let idx = (i + from_idx) % MAX_TASK_NUM; //循环一圈
+            match &self.tasks[idx] {
+                Some(task) => {
+                    if task.is_runnable(){
+                        return self.switch_to_task(idx);
+                    }
+                }
+                None => (),
+            }
+        }
+        Err("no more task")
+    }
+
+    pub fn get_current_idx(&self) -> usize {
+        self.current_idx
+    }
+
     pub fn get_current_trap_context(&self) -> trap::TrapContext {
         match &self.tasks[self.current_idx] {
             Some(task) => task.get_trap_context(),
@@ -76,8 +95,11 @@ impl TaskManager {
         }
     }
 
-    pub fn get_current_idx(&self) -> usize {
-        self.current_idx
+    pub fn save_current_trap_context(&mut self, ctx: &trap::TrapContext) {
+        match &mut self.tasks[self.current_idx] {
+            Some(task) => task.save_trap_context(ctx),
+            None => panic!("never here"),
+        }
     }
 
     pub fn set_current_state(&mut self, state: task::TaskState) {
