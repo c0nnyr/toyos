@@ -4,7 +4,8 @@ use crate::arch::{time, trap};
 pub const MAX_TASK_NUM: usize = 100; //最大支持的TASK数量
 pub const MAX_TASK_SIZE: usize = 0x100000; //TASK包体的最大尺寸，1M
 pub const TASK_RUNNING_ADDR: usize = 0x80400000; //TASK运行地址
-static USER_STACK: [u8; 4096] = [0; 4096];
+pub const USER_STACK_SIZE: usize = 4096;
+const USER_STACK :[u8; MAX_TASK_NUM * USER_STACK_SIZE] = [0;MAX_TASK_NUM * USER_STACK_SIZE];
 
 pub struct TaskManager {
     tasks: [Option<task::Task>; MAX_TASK_NUM],
@@ -28,7 +29,7 @@ impl TaskManager {
             self.tasks[i] = Some(task::Task::new(
                 TASK_RUNNING_ADDR + (i + 1) * MAX_TASK_SIZE,
                 TASK_RUNNING_ADDR + (i + 2) * MAX_TASK_SIZE,
-                USER_STACK.as_ptr() as usize + USER_STACK.len(),
+                USER_STACK.as_ptr() as usize + (i + 1) * USER_STACK_SIZE,
             ));
         }
     }
