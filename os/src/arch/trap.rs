@@ -1,5 +1,7 @@
 use crate::arch::ecall;
 use crate::arch::syscall;
+use crate::task::task;
+use crate::task::task_manager;
 
 use super::riscv::register;
 use super::riscv::trap;
@@ -88,7 +90,7 @@ pub fn init() {
 }
 
 fn build_next_trap_context() -> TrapContext {
-    let mut task_manager = crate::task::task_manager::TASK_MANAGER.lock();
+    let mut task_manager = task_manager::TASK_MANAGER.lock();
     let current_idx = task_manager.get_current_idx();
     match task_manager.switch_to_task(current_idx + 1) {
         Ok(_) => task_manager.get_current_trap_context(),
@@ -101,6 +103,9 @@ fn build_next_trap_context() -> TrapContext {
 
 pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
     let cause = TrapCause::get_current_cause();
+    let set_current_task_state = |state: task::TaskState| { //使用闭包，及时将task_manager的lock释放。
+        task_manager::TASK_MANAGER.lock().set_current_state(state);
+    };
     match cause {
         TrapCause::Exeption(v) => match v {
             Exception::Syscall => {
@@ -108,10 +113,12 @@ pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
                 match syscall_param.syscall_id {
                     syscall::SyscallId::Exit => {
                         kinfo!("Task exiting.");
+                        set_current_task_state(task::TaskState::Stopped);
                         build_next_trap_context()
                     }
                     syscall::SyscallId::Unsupported(v) => {
                         kerror!("Unsupported syscall {}.", v);
+                        set_current_task_state(task::TaskState::Stopped);
                         build_next_trap_context()
                     }
                     _ => {
@@ -125,12 +132,14 @@ pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
             }
             Exception::Unsupported(v) => {
                 kerror!("Unsupported trap exception {:?}", v);
+                set_current_task_state(task::TaskState::Stopped);
                 build_next_trap_context()
             }
         },
         TrapCause::Interrupt(v) => match v {
             Interrupt::Unsupported(v) => {
                 kerror!("Unsupported trap interrupt {:?}", v);
+                set_current_task_state(task::TaskState::Stopped);
                 build_next_trap_context()
             }
         },

@@ -65,6 +65,7 @@ impl TaskManager {
         //这样写可以降低圈复杂度，减少代码量
         self.load_task_code(idx)?;
         self.current_idx = idx;
+        self.set_current_state(task::TaskState::Running);
         Ok(())
     }
 
@@ -77,6 +78,13 @@ impl TaskManager {
 
     pub fn get_current_idx(&self) -> usize {
         self.current_idx
+    }
+
+    pub fn set_current_state(&mut self, state: task::TaskState) {
+        match &mut self.tasks[self.current_idx] {
+            Some(task) => task.set_state(state),
+            None => panic!("never here"),
+        }
     }
 }
 

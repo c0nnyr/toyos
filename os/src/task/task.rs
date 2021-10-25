@@ -1,10 +1,18 @@
 use crate::arch::trap::{self, TrapContextStore}; //引入TrapContextStore才能使用TrapContext身上对这个trait的实现
 
 #[derive(Clone, Copy)]
+pub enum TaskState {
+    Init,
+    Running,
+    Stopped,
+}
+
+#[derive(Clone, Copy)]
 pub struct Task {
     start_addr: usize,
     end_addr: usize,
     trap_context: trap::TrapContext,
+    state: TaskState,
 }
 
 impl Task {
@@ -18,6 +26,7 @@ impl Task {
                 ctx.set_pc(super::task_manager::TASK_RUNNING_ADDR as u64);
                 ctx
             },
+            state: TaskState::Init,
         }
     }
 
@@ -34,5 +43,9 @@ impl Task {
 
     pub fn get_trap_context(&self) -> trap::TrapContext {
         self.trap_context
+    }
+
+    pub fn set_state(&mut self, state: TaskState) {
+        self.state = state;
     }
 }
