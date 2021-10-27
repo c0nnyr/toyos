@@ -66,3 +66,24 @@ impl Time {
         core::time::Duration::from_millis((self.bits / config::CLOCKS_PER_MS) as u64)
     }
 }
+
+#[derive(Copy, Clone)]
+pub struct SIe {
+    pub bits: usize,
+}
+
+impl SIe {
+    fn set_bit(pos: usize) {
+        assert!(pos >= 0 && pos < 64);
+        extern "C" {
+            fn set_sie_bit_asm(pos: usize) -> usize;
+        }
+        unsafe {
+            set_sie_bit_asm(1 << pos); // 转化成pos位为1，其他位为0的数字
+        }
+    }
+
+    pub fn enable_time_interrupt() {
+        Self::set_bit(0x05); //STIE
+    }
+}
