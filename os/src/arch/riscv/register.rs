@@ -35,7 +35,10 @@ impl trap::TrapCauseLoader for TrapCauseLoaderImpl {
     fn load() -> trap::TrapCause {
         let v = SCause::load();
         if v.is_interrupt() {
-            trap::TrapCause::Interrupt(trap::Interrupt::Unsupported(v.get_code()))
+            match v.get_code() {
+                0x05 => trap::TrapCause::Interrupt(trap::Interrupt::Timer),
+                _ => trap::TrapCause::Interrupt(trap::Interrupt::Unsupported(v.get_code())),
+            }
         } else {
             match v.get_code() {
                 8 => trap::TrapCause::Exeption(trap::Exception::Syscall),

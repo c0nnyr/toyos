@@ -13,6 +13,7 @@ pub enum Exception {
 }
 #[derive(Debug)]
 pub enum Interrupt {
+    Timer,
     Unsupported(usize),
 }
 
@@ -127,7 +128,6 @@ pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
                         build_next_trap_context()
                     }
                     syscall::SyscallId::Reschedule => {
-                        kinfo!("Rescheduling");
                         let mut ctx = *ctx; //复制一份才能修改
                         ctx.mv_pc_to_next(); //回到用户态需要执行下一条指令，否则就循环reschedule了。类似putchar这些syscall
                         save_current_trap_context(&ctx);
@@ -149,6 +149,12 @@ pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
             }
         },
         TrapCause::Interrupt(v) => match v {
+            Interrupt::Timer => {
+                kinfo!("Timer at {:?}", super::time::get_now());
+                super::time::set_next_timer(core::time::Duration::from_millis(500));
+                save_current_trap_context(ctx);
+                build_next_trap_context()
+            }
             Interrupt::Unsupported(v) => {
                 kerror!("Unsupported trap interrupt {:?}", v);
                 set_current_task_state(task::TaskState::Stopped);
