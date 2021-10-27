@@ -5,7 +5,7 @@ pub const MAX_TASK_NUM: usize = 100; //最大支持的TASK数量
 pub const MAX_TASK_SIZE: usize = 0x100000; //TASK包体的最大尺寸，1M
 pub const TASK_RUNNING_ADDR: usize = 0x80400000; //TASK运行地址
 pub const USER_STACK_SIZE: usize = 4096;
-const USER_STACK :[u8; MAX_TASK_NUM * USER_STACK_SIZE] = [0;MAX_TASK_NUM * USER_STACK_SIZE];
+const USER_STACK: [u8; MAX_TASK_NUM * USER_STACK_SIZE] = [0; MAX_TASK_NUM * USER_STACK_SIZE];
 
 pub struct TaskManager {
     tasks: [Option<task::Task>; MAX_TASK_NUM],
@@ -74,7 +74,7 @@ impl TaskManager {
             let idx = (i + from_idx) % MAX_TASK_NUM; //循环一圈
             match &self.tasks[idx] {
                 Some(task) => {
-                    if task.is_runnable(){
+                    if task.is_runnable() {
                         return self.switch_to_task(idx);
                     }
                 }

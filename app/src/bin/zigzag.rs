@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use libr::println;
+use libr::{print, println};
 #[no_mangle]
 fn main() {
     let arr = [
@@ -40,13 +40,14 @@ fn main() {
         if i % 2 == 0 {
             for x in left_x..=right_x {
                 let y = left_y - (x - left_x);
-                println!("{} ", arr[y as usize][x as usize]);
+                print!("{} ", arr[y as usize][x as usize]);
             }
         } else {
             for x in (left_x..=right_x).rev() {
                 let y = right_y + (right_x - x);
-                println!("{} ", arr[y as usize][x as usize]);
+                print!("{} ", arr[y as usize][x as usize]);
             }
         }
     }
+    println!("Zigzag done");
 }

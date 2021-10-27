@@ -11,6 +11,8 @@ fn main() {
         .init(log::logger::Level::Info, log::logger::LoggerType::SerialIO);
     arch::trap::init();
     task::task_manager::init();
+    arch::time::enable_time_interrupt();
+    arch::time::set_next_timer(core::time::Duration::from_millis(500));
     build_first_task_trap_context().restore_trap();
 }
 // 这里必须依靠一个函数，及时释放task_manager获得的锁。

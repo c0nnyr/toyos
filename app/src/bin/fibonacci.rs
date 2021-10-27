@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use libr::println;
+use libr::{print, println, system};
 #[no_mangle]
 fn main() {
     const N: usize = 20;
@@ -11,8 +11,10 @@ fn main() {
     for i in 2..N {
         arr[i] = arr[i - 1] + arr[i - 2];
     }
+    system::sleep(core::time::Duration::from_secs(2));
     println!("Fibonacci number from 1 .. {} is:", N);
     for i in 0..N {
-        println!("{}:{}", i + 1, arr[i]);
+        print!("{}:{} ", i + 1, arr[i]);
     }
+    println!("Fibonacci number done");
 }

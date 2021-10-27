@@ -4,6 +4,7 @@ enum EcallType {
     //枚举一下所有支持的对外暴露的ecall能力
     PutcharSerialIO,
     Shutdown,
+    Timer,
 }
 
 //只支持枚举中的那些能力
@@ -12,6 +13,7 @@ fn _ecall(type_: EcallType, a0: usize, a1: usize, a2: usize) -> usize {
         //这里的match保证我们所有的枚举都会被处理，不会漏掉
         EcallType::PutcharSerialIO => 0x01,
         EcallType::Shutdown => 0x08,
+        EcallType::Timer => 0x00,
     };
     raw_ecall::ecall(op_code, a0, a1, a2)
 }
@@ -25,4 +27,15 @@ pub fn putchar_serialio(ch: char) -> usize {
 pub fn shutdown() -> ! {
     _ecall(EcallType::Shutdown, 0, 0, 0);
     panic!("never here")
+}
+
+//设置下一次时钟中断
+pub fn set_next_timer(duration: core::time::Duration) -> usize {
+    let next_trigger_time = super::time::get_now() + duration;
+    _ecall(
+        EcallType::Timer,
+        next_trigger_time.as_millis() as usize * super::config::CLOCKS_PER_MS,
+        0,
+        0,
+    )
 }

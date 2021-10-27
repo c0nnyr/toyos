@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use libr::println;
+use libr::{print, println, system};
 #[no_mangle]
 fn main() {
     const N: usize = 100;
@@ -18,10 +18,12 @@ fn main() {
             }
         }
     }
+    system::sleep(core::time::Duration::from_secs(2));
     println!("Prime number from 0 .. {} is:", N);
     for i in 0..=N {
         if arr[i] != 0 {
-            println!("{}", arr[i]);
+            print!("{} ", arr[i]);
         }
     }
+    println!("Prime number done");
 }
