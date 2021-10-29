@@ -104,7 +104,8 @@ fn build_next_trap_context() -> TrapContext {
 
 pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
     let cause = TrapCause::get_current_cause();
-    let set_current_task_state = |state: task::TaskState| { //使用闭包，及时将task_manager的lock释放。
+    let set_current_task_state = |state: task::TaskState| {
+        //使用闭包，及时将task_manager的lock释放。
         task_manager::TASK_MANAGER.lock().set_current_state(state);
     };
     let save_current_trap_context = |ctx: &TrapContext| {

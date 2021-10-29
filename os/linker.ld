@@ -23,4 +23,6 @@ SECTIONS
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     }
+    . = ALIGN(4K);
+    kernel_end_addr_asm = .;
 }

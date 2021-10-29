@@ -20,7 +20,8 @@ impl Task {
         Task {
             start_addr,
             end_addr,
-            trap_context: { //初始化为这个task最初应该的样子
+            trap_context: {
+                //初始化为这个task最初应该的样子
                 let mut ctx = trap::TrapContext::default();
                 ctx.set_sp(stack_bottom as u64);
                 ctx.set_pc(super::task_manager::TASK_RUNNING_ADDR as u64);
@@ -53,7 +54,7 @@ impl Task {
         self.state = state;
     }
 
-    pub fn is_runnable(&self)->bool{
+    pub fn is_runnable(&self) -> bool {
         self.state == TaskState::Init || self.state == TaskState::Running
     }
 }
