@@ -106,8 +106,10 @@ impl SAtp {
         }
     }
 
-    pub fn with_root_ppn(ppn: usize) -> SAtp {
+    pub fn with_root_ppn(&self, ppn: usize) -> SAtp {
         let mode = 8 << 60; //60~63位为mode，8表示使用Sv39模式，虚拟地址只使用低39位，高25位必须为0
-        SAtp { bits: mode | ppn }
+        let new = *self;
+        new.bits = mode | ppn;
+        new //完全覆盖了
     }
 }

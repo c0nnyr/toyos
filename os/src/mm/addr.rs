@@ -17,3 +17,12 @@ impl From<PhysicalAddr> for PhysicalPageNumber {
         PhysicalPageNumber(v.0 >> PAGE_MASK_BITS)
     }
 }
+
+impl Into<PhysicalAddr> for PhysicalPageNumber {
+    fn into(self) -> PhysicalAddr {
+        PhysicalAddr(self.0 << PAGE_MASK_BITS)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct VirtualPageNumber(pub usize);

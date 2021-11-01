@@ -2,30 +2,21 @@
 #![no_main]
 #![feature(global_asm)]
 
-use crate::{
-    arch::trap::{self, TrapContextStore},
-    mm::addr::PhysicalAddr,
-};
+use crate::arch::trap::{self, TrapContextStore};
 
 #[no_mangle]
 fn main() {
-    extern "C" {
-        fn kernel_end_addr_asm();
-    }
     log::logger::LOGGER
         .lock()
         .init(log::logger::Level::Info, log::logger::LoggerType::SerialIO);
-    kinfo!("Kernel end_addr 0x{:x}.", kernel_end_addr_asm as usize);
     arch::trap::init();
-    mm::physical_mm_manager::PHYSICAL_MM_MANAGER.lock().init(
-        PhysicalAddr(kernel_end_addr_asm as usize),
-        PhysicalAddr(kernel_end_addr_asm as usize + 10 * (1 << 20)), // 10M 空间
-    );
+    mm::init();
     task::task_manager::init();
     arch::time::enable_time_interrupt();
     arch::time::set_next_timer(core::time::Duration::from_millis(500));
     build_first_task_trap_context().restore_trap();
 }
+
 // 这里必须依靠一个函数，及时释放task_manager获得的锁。
 fn build_first_task_trap_context() -> trap::TrapContext {
     let mut task_manager = task::task_manager::TASK_MANAGER.lock();
