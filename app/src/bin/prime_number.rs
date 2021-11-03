@@ -18,7 +18,7 @@ fn main() {
             }
         }
     }
-    system::sleep(core::time::Duration::from_secs(2));
+    // system::sleep(core::time::Duration::from_secs(2));
     println!("Prime number from 0 .. {} is:", N);
     for i in 0..=N {
         if arr[i] != 0 {

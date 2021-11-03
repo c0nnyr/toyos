@@ -28,6 +28,7 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
         extern "C" {
             fn restore_trap_asm(ctx: &TrapContextStoreImpl) -> !;
         }
+        // kinfo!("restore");
         unsafe { restore_trap_asm(self) }
     }
 
@@ -72,5 +73,6 @@ pub fn init() {
 
 #[no_mangle]
 fn trap_entry(ctx: &mut TrapContextStoreImpl) {
+    // kinfo!("trap entry");
     *ctx = *trap::dispatch_trap(&mut trap::TrapContext::new(ctx)).raw();
 }

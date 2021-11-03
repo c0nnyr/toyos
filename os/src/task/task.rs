@@ -23,8 +23,10 @@ impl Task {
             trap_context: {
                 //初始化为这个task最初应该的样子
                 let mut ctx = trap::TrapContext::default();
-                ctx.set_sp(stack_bottom as u64);
-                ctx.set_pc(super::task_manager::TASK_RUNNING_ADDR as u64);
+                // ctx.set_sp(stack_bottom as u64);
+                ctx.set_sp(0xfffff);
+                // ctx.set_pc(super::task_manager::TASK_RUNNING_ADDR as u64);
+                ctx.set_pc(0);
                 ctx
             },
             state: TaskState::Init,

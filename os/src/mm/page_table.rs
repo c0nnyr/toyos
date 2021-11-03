@@ -47,14 +47,13 @@ impl PageTableEntry {
         self.get_bit(0)
     }
     pub fn with_page_number(&self, page_number: PhysicalPageNumber) -> Self {
-        assert!(page_number.0 < (1 << 44));
-        Self(page_number.0 << 44 | (self.0 & ((1 << 44) - 1)))
+        Self(page_number.0 << 10 | (self.0 & ((1 << 10) - 1)))
     }
 }
 
 impl Into<PhysicalPageNumber> for PageTableEntry {
     fn into(self) -> PhysicalPageNumber {
-        PhysicalPageNumber(self.0>>44)
+        PhysicalPageNumber(self.0 >> 10)
     }
 }
 
@@ -62,79 +61,108 @@ pub type InnerPageTable = [PageTableEntry; PAGE_SIZE / core::mem::size_of::<Page
 pub struct PageTable {
     pub physical_page: physical_mm_manager::PhysicalPageGuard, //own
     pub entries: &'static mut InnerPageTable,
-    pub level: usize,
 }
 
 pub struct PageTables {
-    page_tables: [Option<PageTable>; 10],
+    pub page_tables: [Option<PageTable>; 10],
 }
 
 impl PageTables {
-    pub fn new()->Self{
-        Self{
-            page_tables:[Some(PHYSICAL_MM_MANAGER.lock().alloc().unwrap().into()),None,None,None,None,None,None,None,None,None],
+    pub fn new() -> Self {
+        Self {
+            page_tables: [
+                Some(PHYSICAL_MM_MANAGER.lock().alloc().unwrap().into()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ],
         }
     }
     pub fn map(&mut self, vpn: addr::VirtualPageNumber, ppn: addr::PhysicalPageNumber) {
+        // kinfo!("map {:x?} to {:x?}", vpn, ppn);
         let mut offsets: [usize; 3] = [0; 3];
         for i in 0..3 {
-            offsets[i] = (vpn.0 >> (i * 9)) & (1 << 9 - 1);
+            offsets[i] = (vpn.0 >> (i * 9)) & 511;
         }
-        let mut cur_ppn = self.page_tables[0].as_ref().unwrap().physical_page.guard_page_number;
-        for (level, &offset) in offsets.iter().skip(1).rev().enumerate() {
-            let cur_table = self.find_page_table(level, cur_ppn);
-            match cur_table{
-                Some(cur_table)=>{
+        // kerror!("offsets:{:?}", offsets);
+        let mut cur_ppn = self.page_tables[0]
+            .as_ref()
+            .unwrap()
+            .physical_page
+            .guard_page_number;
+        for &offset in offsets.iter().skip(1).rev() {
+            // kerror!("cur_ppn {:x?}", cur_ppn);
+            let cur_table = self.find_page_table(cur_ppn);
+            match cur_table {
+                Some(cur_table) => {
                     let entry = &mut cur_table.entries[offset];
-                    if entry.is_valid(){
+                    if entry.is_valid() {
                         cur_ppn = (*entry).into();
+                        // kerror!("valid entry of offset {}, next ppn {:x?}", offset, cur_ppn);
+                        let entry = &mut cur_table.entries[offset];
+                        // kerror!(
+                        //     "valid middle entry offset {} after set {:x?}",
+                        //     offset,
+                        //     entry.0
+                        // );
                     } else {
-                        let mut page_table :PageTable = PHYSICAL_MM_MANAGER.lock().alloc().unwrap().into();
-                        *entry = entry.with_access_mode(true)
-                                    .with_validation(true)
-                                    .with_permission(true, true, true)
-                                    .with_access_mode(true)
-                                    .with_page_number(page_table.physical_page.guard_page_number);
+                        let mut page_table: PageTable =
+                            PHYSICAL_MM_MANAGER.lock().alloc().unwrap().into();
+                        *entry = entry
+                            // .with_access_mode(true)
+                            .with_validation(true)
+                            .with_permission(false, false, false)
+                            .with_page_number(page_table.physical_page.guard_page_number);
                         cur_ppn = (*entry).into();
-                        page_table.level = level+1;
+                        // kerror!(
+                        //     "invalid entry of offset {}, create new table at {:x?}",
+                        //     offset,
+                        //     cur_ppn
+                        // );
+                        let entry = &mut cur_table.entries[offset];
+                        // kerror!(
+                        //     "invalid middle entry offset {} after set {:x?}",
+                        //     offset,
+                        //     entry.0
+                        // );
                         self.save_page_table(page_table).unwrap();
                     }
-                },
-                None=>{
+                }
+                None => {
                     panic!("bug")
                 }
             }
         }
-        let cur_table = self.find_page_table(2, cur_ppn).unwrap();
+        let cur_table = self.find_page_table(cur_ppn).unwrap();
         let entry = &mut cur_table.entries[offsets[0]];
-        *entry = entry.with_access_mode(true)
-                    .with_validation(true)
-                    .with_permission(true, true, true)
-                    .with_access_mode(true)
-                    .with_page_number(ppn);
-
+        *entry = entry
+            .with_access_mode(vpn.0 < 0x100)
+            .with_validation(true)
+            .with_permission(true, true, true)
+            .with_page_number(ppn);
+        let entry = &mut cur_table.entries[offsets[0]];
+        // kerror!("final entry after set {:x?}", entry.0);
     }
 
-    fn save_page_table(
-        &mut self,
-        table:PageTable,
-    ) -> Result<(),&'static str>  {
+    fn save_page_table(&mut self, table: PageTable) -> Result<(), &'static str> {
         for page_table in &mut self.page_tables {
-            if let None = page_table{
+            if let None = page_table {
                 *page_table = Some(table);
                 return Ok(());
             }
         }
         Err("not enough")
     }
-    fn find_page_table(
-        &mut self,
-        level: usize,
-        ppn: addr::PhysicalPageNumber,
-    ) -> Option<&mut PageTable> {
+    fn find_page_table(&mut self, ppn: addr::PhysicalPageNumber) -> Option<&mut PageTable> {
         for page_table in &mut self.page_tables {
             if let Some(page_table) = page_table {
-                if page_table.level == level && page_table.physical_page.guard_page_number == ppn {
+                if page_table.physical_page.guard_page_number == ppn {
                     return Some(page_table);
                 }
             }

@@ -24,7 +24,7 @@ pub struct PhysicalPageGuard {
 impl Drop for PhysicalPageGuard {
     fn drop(&mut self) {
         PHYSICAL_MM_MANAGER.lock().free(self.guard_page_number);
-        self.guard_page_number = PhysicalPageNumber(core::usize::MAX);
+        kerror!("drop physical page {:x?}", self.guard_page_number);
     }
 }
 
@@ -41,7 +41,6 @@ impl Into<page_table::PageTable> for PhysicalPageGuard {
             page_table::PageTable {
                 physical_page: self, //move
                 entries,
-                level:0,//默认
             }
         }
     }
@@ -53,6 +52,7 @@ impl PhysicalMMManager {
         assert!(end.is_page_start());
         self.start = start.into();
         self.end = end.into();
+        kinfo!("mm area: from {:x?} to {:x?}", self.start, self.end);
         assert!(self.end.0 - self.start.0 <= MAX_MANAGE_PAGE_NUM);
     }
 
@@ -65,13 +65,15 @@ impl PhysicalMMManager {
     }
 
     pub fn alloc(&mut self) -> Option<PhysicalPageGuard> {
-        let cur = self.start;
+        let mut cur = self.start;
         while cur < self.end {
             if !self.is_occupied(cur) {
                 self.set_occupied(cur, true);
                 return Some(PhysicalPageGuard {
                     guard_page_number: cur,
                 });
+            } else {
+                cur = PhysicalPageNumber(cur.0 + 1);
             }
         }
         None

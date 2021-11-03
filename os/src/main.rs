@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(global_asm)]
+#![feature(llvm_asm)]
 
 use crate::arch::trap::{self, TrapContextStore};
 
@@ -12,8 +13,8 @@ fn main() {
     arch::trap::init();
     mm::init();
     task::task_manager::init();
-    arch::time::enable_time_interrupt();
-    arch::time::set_next_timer(core::time::Duration::from_millis(500));
+    // arch::time::enable_time_interrupt();
+    // arch::time::set_next_timer(core::time::Duration::from_millis(500));
     build_first_task_trap_context().restore_trap();
 }
 

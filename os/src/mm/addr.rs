@@ -10,7 +10,7 @@ impl PhysicalAddr {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct PhysicalPageNumber(pub usize);
 impl From<PhysicalAddr> for PhysicalPageNumber {
     fn from(v: PhysicalAddr) -> Self {
@@ -24,5 +24,5 @@ impl Into<PhysicalAddr> for PhysicalPageNumber {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct VirtualPageNumber(pub usize);
