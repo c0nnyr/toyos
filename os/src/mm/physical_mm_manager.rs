@@ -35,12 +35,13 @@ impl Into<page_table::PageTable> for PhysicalPageGuard {
             let entries = (addr.0 as *mut page_table::InnerPageTable)
                 .as_mut()
                 .unwrap();
-            for v in entries.0.iter_mut() {
-                v.empty();
+            for v in entries.iter_mut() {
+                v.clear();
             }
             page_table::PageTable {
-                physical_page_guard: self,
+                physical_page: self, //move
                 entries,
+                level:0,//默认
             }
         }
     }
@@ -64,7 +65,7 @@ impl PhysicalMMManager {
     }
 
     pub fn alloc(&mut self) -> Option<PhysicalPageGuard> {
-        let mut cur = self.start;
+        let cur = self.start;
         while cur < self.end {
             if !self.is_occupied(cur) {
                 self.set_occupied(cur, true);
