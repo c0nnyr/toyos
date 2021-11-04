@@ -2,14 +2,13 @@ pub mod addr;
 pub mod page_table;
 pub mod physical_mm_manager;
 use crate::arch::riscv::register;
-use riscv2::register::satp;
 
 pub fn init() {
     init_physical_mm();
     init_kernel_table();
 }
 
-static KERNEL_PAGE_TABLES: spin::Mutex<page_table::PageTables> =
+pub static KERNEL_PAGE_TABLES: spin::Mutex<page_table::PageTables> =
     spin::Mutex::new(page_table::PageTables {
         page_tables: [None, None, None, None, None, None, None, None, None, None],
     });
@@ -25,15 +24,8 @@ fn init_kernel_table() {
             addr::PhysicalPageNumber(i + 0x80400),
         );
     }
-    let satp = register::SAtp { bits: 0 }
-        .with_root_ppn(
-            tables.page_tables[0]
-                .as_ref()
-                .unwrap()
-                .physical_page
-                .guard_page_number
-                .0,
-        )
+    register::SAtp::new()
+        .with_root_ppn(tables.get_root().0)
         .set();
     kinfo!("map done!");
     KERNEL_PAGE_TABLES.lock().page_tables = tables.page_tables;

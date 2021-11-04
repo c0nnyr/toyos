@@ -97,6 +97,9 @@ pub struct SAtp {
 }
 
 impl SAtp {
+    pub fn new() -> Self {
+        SAtp { bits: 0 }
+    }
     pub fn set(&self) {
         extern "C" {
             fn set_satp_asm(satp: usize) -> usize;

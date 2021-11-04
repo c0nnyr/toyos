@@ -1,4 +1,5 @@
 use super::task;
+use crate::arch::riscv::register;
 use crate::arch::{time, trap};
 
 pub const MAX_TASK_NUM: usize = 100; //最大支持的TASK数量
@@ -39,24 +40,35 @@ impl TaskManager {
         if idx >= MAX_TASK_NUM {
             return Err("idx exceed max task num");
         }
-        match &self.tasks[idx] {
-            //避免拷贝，所以才加上个&
-            Some(task) => {
-                kinfo!(
-                    "==============================LoadingTask {} at {:?}.",
-                    idx,
-                    time::get_now()
-                );
-                let code = task.get_code();
-                unsafe {
-                    let dst: &mut [u8] =//这里需要的是一个可变的数组引用，也同样是不安全的
-                        core::slice::from_raw_parts_mut(TASK_RUNNING_ADDR as *mut u8, code.len());
-                    dst.copy_from_slice(code); //拷贝代码
-                }
-                Ok(())
-            }
-            None => Err("no task to load"),
+        let kernel_space = &mut crate::mm::KERNEL_PAGE_TABLES.lock();
+        for i in 0x0..0x100 {
+            kernel_space.map(
+                crate::mm::addr::VirtualPageNumber(i),
+                crate::mm::addr::PhysicalPageNumber((idx + 1) * 0x100 + 0x80400 + i),
+            );
         }
+        register::SAtp::new()
+            .with_root_ppn(kernel_space.get_root().0)
+            .set();
+        Ok(())
+        // match &self.tasks[idx] {
+        //     //避免拷贝，所以才加上个&
+        //     Some(task) => {
+        //         kinfo!(
+        //             "==============================LoadingTask {} at {:?}.",
+        //             idx,
+        //             time::get_now()
+        //         );
+        //         let code = task.get_code();
+        //         unsafe {
+        //             let dst: &mut [u8] =//这里需要的是一个可变的数组引用，也同样是不安全的
+        //                 core::slice::from_raw_parts_mut(TASK_RUNNING_ADDR as *mut u8, code.len());
+        //             dst.copy_from_slice(code); //拷贝代码
+        //         }
+        //         Ok(())
+        //     }
+        //     None => Err("no task to load"),
+        // }
     }
 
     pub fn switch_to_task(&mut self, idx: usize) -> Result<(), &'static str> {

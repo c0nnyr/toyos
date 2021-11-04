@@ -84,6 +84,13 @@ impl PageTables {
             ],
         }
     }
+    pub fn get_root(&self) -> addr::PhysicalPageNumber {
+        self.page_tables[0]
+            .as_ref()
+            .unwrap()
+            .physical_page
+            .guard_page_number
+    }
     pub fn map(&mut self, vpn: addr::VirtualPageNumber, ppn: addr::PhysicalPageNumber) {
         // kinfo!("map {:x?} to {:x?}", vpn, ppn);
         let mut offsets: [usize; 3] = [0; 3];
