@@ -40,6 +40,11 @@ impl TaskManager {
         if idx >= MAX_TASK_NUM {
             return Err("idx exceed max task num");
         }
+        kinfo!(
+            "==============================LoadingTask {} at {:?}.",
+            idx,
+            time::get_now()
+        );
         let kernel_space = &mut crate::mm::KERNEL_PAGE_TABLES.lock();
         for i in 0x0..0x100 {
             kernel_space.map(

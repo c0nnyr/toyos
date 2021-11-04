@@ -11,7 +11,7 @@ fn main() {
     for i in 2..N {
         arr[i] = arr[i - 1] + arr[i - 2];
     }
-    // system::sleep(core::time::Duration::from_secs(2));
+    system::sleep(core::time::Duration::from_secs(2));
     println!("Fibonacci number from 1 .. {} is:", N);
     for i in 0..N {
         print!("{}:{} ", i + 1, arr[i]);
