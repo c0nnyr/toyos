@@ -9,6 +9,10 @@ fn main() {
     log::logger::LOGGER
         .lock()
         .init(log::logger::Level::Info, log::logger::LoggerType::SerialIO);
+    extern "C" {
+        fn kernel_end_asm(); //导出符号，只能这种方式，后面要用的时候强转类型
+    }
+    kinfo!("kernel end at 0x{:x}", kernel_end_asm as usize); //{:x}以16进制打印
     arch::trap::init();
     task::task_manager::init();
     arch::time::enable_time_interrupt();

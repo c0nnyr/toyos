@@ -23,4 +23,5 @@ SECTIONS
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     }
+    kernel_end_asm = .;
 }
