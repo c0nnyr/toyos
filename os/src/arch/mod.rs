@@ -4,3 +4,4 @@ pub mod syscall;
 pub mod time;
 pub mod trap;
 pub use riscv::config;
+pub mod page_table;

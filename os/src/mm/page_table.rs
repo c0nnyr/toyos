@@ -1,4 +1,5 @@
-use super::addr;
+use super::{addr, ppn_manager};
+use crate::arch;
 
 #[derive(Copy, Clone)]
 pub struct PageTableEntry {
@@ -20,5 +21,35 @@ impl Default for PageTableEntry {
             execute: false,
             user: false,
         }
+    }
+}
+
+pub struct PageTable {
+    ppn: ppn_manager::PhysicalPageNumberGuard,
+    page_table: &'static mut arch::page_table::PageTableImpl, //赋予静态的生命周期才好管理，这块内存只本结构管理。一定要mut的，否则之后没法修改
+}
+
+impl PageTable {
+    pub fn set_entry(&mut self, offset: usize, entry: PageTableEntry) {
+        self.page_table.set_entry(offset, entry.into());
+    }
+    pub fn get_entry(&self, offset: usize) -> PageTableEntry {
+        self.page_table.get_entry(offset).into()
+    }
+}
+
+impl From<ppn_manager::PhysicalPageNumberGuard> for PageTable {
+    fn from(v: ppn_manager::PhysicalPageNumberGuard) -> Self {
+        let page_table = unsafe {
+            (v.as_addr() as *mut arch::page_table::PageTableImpl)
+                .as_mut()
+                .unwrap()
+        };
+        page_table.clear(); //清空，全部都无效
+        let mut ret = Self {
+            ppn: v, //ownership move here
+            page_table,
+        };
+        ret
     }
 }

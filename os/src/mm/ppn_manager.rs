@@ -12,6 +12,12 @@ impl Drop for PhysicalPageNumberGuard {
     }
 }
 
+impl PhysicalPageNumberGuard {
+    pub fn as_addr(&self) -> usize {
+        self.ppn.as_addr()
+    }
+}
+
 impl core::fmt::Display for PhysicalPageNumberGuard {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_fmt(format_args!("{}", self.ppn))

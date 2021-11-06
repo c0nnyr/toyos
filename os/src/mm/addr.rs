@@ -15,6 +15,10 @@ impl PhysicalPageNumber {
             bits: addr >> PAGE_SIZE_BIT,
         }
     }
+
+    pub fn as_addr(&self) -> usize {
+        self.bits << PAGE_SIZE_BIT
+    }
 }
 
 impl From<usize> for PhysicalPageNumber {

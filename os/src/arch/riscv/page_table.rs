@@ -1,10 +1,12 @@
+use core::mem::size_of;
+
 use crate::mm::{addr, page_table};
 #[derive(Copy, Clone)]
-struct PageTableEntry {
+pub struct PageTableEntryImpl {
     bits: u64,
 }
 
-impl From<page_table::PageTableEntry> for PageTableEntry {
+impl From<page_table::PageTableEntry> for PageTableEntryImpl {
     fn from(v: page_table::PageTableEntry) -> Self {
         let mut bits: u64 = v.ppn.bits as u64;
         bits = bits << 6; //忽略掉RSV和D、A、G的设置，共5bit
@@ -21,7 +23,7 @@ impl From<page_table::PageTableEntry> for PageTableEntry {
     }
 }
 
-impl Into<page_table::PageTableEntry> for PageTableEntry {
+impl Into<page_table::PageTableEntry> for PageTableEntryImpl {
     fn into(self) -> page_table::PageTableEntry {
         let get_bit = |pos: u64| self.bits & (1 << pos) == 1;
         page_table::PageTableEntry {
@@ -31,6 +33,24 @@ impl Into<page_table::PageTableEntry> for PageTableEntry {
             write: get_bit(2),
             read: get_bit(1),
             valid: get_bit(0),
+        }
+    }
+}
+
+pub struct PageTableImpl {
+    entries: [PageTableEntryImpl; addr::PAGE_SIZE / size_of::<PageTableEntryImpl>()],
+}
+
+impl PageTableImpl {
+    pub fn set_entry(&mut self, offset: usize, entry: PageTableEntryImpl) {
+        self.entries[offset] = entry;
+    }
+    pub fn get_entry(&self, offset: usize) -> PageTableEntryImpl {
+        self.entries[offset]
+    }
+    pub fn clear(&mut self) {
+        for entry in &mut self.entries {
+            *entry = PageTableEntryImpl { bits: 0 };
         }
     }
 }
