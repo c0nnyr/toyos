@@ -1,4 +1,7 @@
-use super::{addr, ppn_manager};
+use super::{
+    addr,
+    ppn_manager::{self, PPNManager},
+};
 use crate::arch;
 
 #[derive(Copy, Clone)]
@@ -51,5 +54,33 @@ impl From<ppn_manager::PhysicalPageNumberGuard> for PageTable {
             page_table,
         };
         ret
+    }
+}
+
+const BASE_PAGE_TABLE_COUNT: usize = 10;
+pub struct PageTableTree {
+    root_table: Option<PageTable>,
+    page_tables: [Option<PageTable>; BASE_PAGE_TABLE_COUNT], //先定义10个，不满足以后在像动态增加的办法
+}
+
+impl Default for PageTableTree {
+    fn default() -> Self {
+        Self {
+            root_table: None,
+            page_tables: [None, None, None, None, None, None, None, None, None, None], //PageTable不是Copy的，所以不能用[None;BASE_PAGE_TABLE_COUNT]初始化
+        }
+    }
+}
+
+impl PageTableTree {
+    pub fn init(&mut self) -> Result<(), &'static str> {
+        let page = ppn_manager::PPN_MANAGER.lock().alloc();
+        match page {
+            Some(page) => {
+                self.root_table = Some(page.into()); //将申请的内存转换成PageTable用
+                Ok(())
+            }
+            None => Err("no more memory"),
+        }
     }
 }
