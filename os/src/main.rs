@@ -13,8 +13,19 @@ fn main() {
         .init(log::logger::Level::Info, log::logger::LoggerType::SerialIO);
     mm::ppn_manager::init();
     {
+        //分配第一个页
         let tmp1 = mm::ppn_manager::PPN_MANAGER.lock().alloc().unwrap();
-        println!("alloc {:?}", tmp1);
+        kinfo!("alloc tmp1 {}", tmp1.ppn);
+        //分配第二个页
+        let tmp2 = mm::ppn_manager::PPN_MANAGER.lock().alloc().unwrap();
+        kinfo!("alloc tmp2 {}", tmp2.ppn);
+        //生命周期结束，释放第二个页、第一个页
+    }
+    {
+        //分配第三个页，这个时候复用上面第一个页（刚释放）
+        let tmp3 = mm::ppn_manager::PPN_MANAGER.lock().alloc().unwrap();
+        kinfo!("alloc tmp3 {}", tmp3.ppn);
+        //释放第三个页
     }
     arch::trap::init();
     task::task_manager::init();

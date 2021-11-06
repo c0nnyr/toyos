@@ -22,3 +22,9 @@ impl From<usize> for PhysicalPageNumber {
         Self { bits: v }
     }
 }
+
+impl core::fmt::Display for PhysicalPageNumber {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_fmt(format_args!("0x{:x}", self.bits))
+    }
+}

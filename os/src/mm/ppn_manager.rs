@@ -1,12 +1,20 @@
 use super::addr;
 
+#[derive(Debug)]
 pub struct PhysicalPageNumberGuard {
-    ppn: addr::PhysicalPageNumber,
+    pub ppn: addr::PhysicalPageNumber,
 }
 
 impl Drop for PhysicalPageNumberGuard {
     fn drop(&mut self) {
-        kinfo!("dropping ppn:{:?}", self.ppn); //TOOD 真正free
+        kinfo!("dropping ppn: {}", self.ppn);
+        PPN_MANAGER.lock().free(self.ppn);
+    }
+}
+
+impl core::fmt::Display for PhysicalPageNumberGuard {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_fmt(format_args!("{}", self.ppn))
     }
 }
 
