@@ -2,6 +2,7 @@
 #![no_main]
 #![feature(global_asm)]
 #![feature(llvm_asm)]
+#![feature(const_for)]
 
 use crate::arch::trap::{self, TrapContextStore};
 

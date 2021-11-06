@@ -1,13 +1,29 @@
+use core::mem::size_of;
+
 use crate::arch::syscall;
 use crate::arch::trap;
+
+use super::register::TrapCauseLoaderImpl;
 global_asm!(include_str!("trap.asm"));
 
 #[repr(C)]
 #[derive(Copy, Clone)] //这样就能正常拷贝了。Copy+Clone说明使用=的时候，不是使用move语义转移所有权，而是拷贝一份
 pub struct TrapContextStoreImpl {
-    //需要保存32寄存器，以及sepc
-    //x0..=x32, sepc，一共33个
-    ctx: [u64; 33], //使用数组，方便直接汇编的时候操作，免得有对齐的问题
+    //需要保存32寄存器，以及sepc, sscratch
+    //x0..=x32, sepc, sscratch，一共34个，sscratch用于保存内核态指针
+    ctx: [u64; 34], //使用数组，方便直接汇编的时候操作，免得有对齐的问题
+}
+
+impl TrapContextStoreImpl {
+    pub fn save(&self) -> &'static TrapContextStoreImpl {
+        unsafe {
+            let ctx = (self.ctx[33] as *mut TrapContextStoreImpl)
+                .as_mut()
+                .unwrap();
+            *ctx = *self;
+            ctx
+        }
+    }
 }
 
 impl trap::TrapContextStore for TrapContextStoreImpl {
@@ -17,6 +33,9 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
 
     fn set_pc(&mut self, pc: u64) {
         self.ctx[32] = pc; //x32就是sepc
+    }
+    fn set_kernel_stack(&mut self, stack_top: u64) {
+        self.ctx[33] = stack_top - size_of::<TrapContextStoreImpl>() as u64; //预先分配个空间
     }
 
     fn mv_pc_to_next(&mut self) {
@@ -50,21 +69,13 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
 }
 impl Default for TrapContextStoreImpl {
     fn default() -> Self {
-        TrapContextStoreImpl { ctx: [0; 33] }
+        TrapContextStoreImpl { ctx: [0; 34] }
     }
 }
 
 pub fn init() {
     extern "C" {
         fn init_trap_entry_asm();
-        fn trap_context_asm();
-        fn trap_context_end_asm();
-    }
-    //校验一下TrapContextStore的大小
-    if core::mem::size_of::<TrapContextStoreImpl>()
-        != (trap_context_end_asm as usize - trap_context_asm as usize)
-    {
-        panic!("TrapContextStore size not equal");
     }
     unsafe {
         init_trap_entry_asm();
@@ -72,7 +83,9 @@ pub fn init() {
 }
 
 #[no_mangle]
-fn trap_entry(ctx: &mut TrapContextStoreImpl) {
+fn trap_entry(ctx: &'static TrapContextStoreImpl) -> &'static TrapContextStoreImpl {
     // kinfo!("trap entry");
-    *ctx = *trap::dispatch_trap(&mut trap::TrapContext::new(ctx)).raw();
+    trap::dispatch_trap(&mut trap::TrapContext::new(ctx))
+        .raw()
+        .save()
 }

@@ -41,6 +41,7 @@ pub trait TrapContextStore: Default {
     fn restore_trap(&self) -> !;
     fn get_syscall_param(&self) -> syscall::SyscallParam;
     fn set_syscall_return_code(&mut self, code: usize);
+    fn set_kernel_stack(&mut self, stack_top: u64);
 }
 
 #[derive(Clone, Copy)]
@@ -54,6 +55,9 @@ impl TrapContextStore for TrapContext {
     }
     fn set_pc(&mut self, pc: u64) {
         self.store.set_pc(pc)
+    }
+    fn set_kernel_stack(&mut self, stack_top: u64) {
+        self.store.set_kernel_stack(stack_top);
     }
     fn mv_pc_to_next(&mut self) {
         self.store.mv_pc_to_next()

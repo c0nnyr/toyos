@@ -1,4 +1,4 @@
-use super::task;
+use super::task::{self, Task};
 use crate::arch::riscv::register;
 use crate::arch::{time, trap};
 
@@ -40,11 +40,11 @@ impl TaskManager {
         if idx >= MAX_TASK_NUM {
             return Err("idx exceed max task num");
         }
-        kinfo!(
-            "==============================LoadingTask {} at {:?}.",
-            idx,
-            time::get_now()
-        );
+        // kinfo!(
+        //     "==============================LoadingTask {} at {:?}.",
+        //     idx,
+        //     time::get_now()
+        // );
         let kernel_space = &mut crate::mm::KERNEL_PAGE_TABLES.lock();
         for i in 0x0..0x100 {
             kernel_space.map(
@@ -128,7 +128,15 @@ impl TaskManager {
 }
 
 pub static TASK_MANAGER: spin::Mutex<TaskManager> = spin::Mutex::new(TaskManager {
-    tasks: [None; MAX_TASK_NUM],
+    tasks: [
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None,
+    ],
     current_idx: 0,
 });
 
