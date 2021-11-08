@@ -9,7 +9,7 @@ pub enum TaskState {
 
 #[derive(Clone, Copy)]
 pub struct Task {
-    start_addr: usize,
+    pub start_addr: usize,
     end_addr: usize,
     trap_context: trap::TrapContext,
     state: TaskState,

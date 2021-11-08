@@ -1,5 +1,6 @@
 use super::task;
 use crate::arch::{time, trap};
+use crate::mm::{self, addr, page_table};
 
 pub const MAX_TASK_NUM: usize = 100; //最大支持的TASK数量
 pub const MAX_TASK_SIZE: usize = 0x100000; //TASK包体的最大尺寸，1M
@@ -47,12 +48,24 @@ impl TaskManager {
                     idx,
                     time::get_now()
                 );
-                let code = task.get_code();
-                unsafe {
-                    let dst: &mut [u8] =//这里需要的是一个可变的数组引用，也同样是不安全的
-                        core::slice::from_raw_parts_mut(TASK_RUNNING_ADDR as *mut u8, code.len());
-                    dst.copy_from_slice(code); //拷贝代码
+
+                let kernel_page_table_tree = &mut mm::KERNEL_PAGE_TABLE_TREE.lock();
+                for i in 0..addr::VirtualPageNumber::floor(MAX_TASK_SIZE).bits {
+                    let addr_offset = addr::VirtualPageNumber::from(i).as_addr();
+                    //遍历task对应的页
+                    let vpn = addr::VirtualPageNumber::floor(TASK_RUNNING_ADDR + addr_offset);
+                    let ppn = addr::PhysicalPageNumber::floor(task.start_addr + addr_offset);
+                    let entry = page_table::PageTableEntry {
+                        ppn: ppn,
+                        valid: true,
+                        read: true,
+                        write: true,
+                        execute: true,
+                        user: true,
+                    };
+                    kernel_page_table_tree.map(vpn, entry).unwrap();
                 }
+                kernel_page_table_tree.active(); //真正启用地址映射
                 Ok(())
             }
             None => Err("no task to load"),

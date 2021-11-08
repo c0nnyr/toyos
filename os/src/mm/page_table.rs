@@ -211,7 +211,7 @@ impl PageTableTree {
         }
     }
 
-    pub fn active(&self){
+    pub fn active(&self) {
         arch::page_table::active_page_table_root(self.page_tables[0].as_ref().unwrap().ppn.ppn);
     }
 }
