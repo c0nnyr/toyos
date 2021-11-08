@@ -1,4 +1,4 @@
-APP_MAIN_PHY_ADDR = 0x80400000; # 应用程序加载的地址
+APP_MAIN_PHY_ADDR = 0x0; # 应用程序加载的地址
 SECTIONS
 {
     . = APP_MAIN_PHY_ADDR; # 表示这个地方地址是APP_MAIN_PHY_ADDR

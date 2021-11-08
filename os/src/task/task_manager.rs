@@ -51,7 +51,7 @@ impl TaskManager {
                 for i in 0..addr::VirtualPageNumber::floor(MAX_TASK_SIZE).bits {
                     let addr_offset = addr::VirtualPageNumber::from(i).as_addr();
                     //遍历task对应的页
-                    let vpn = addr::VirtualPageNumber::floor(TASK_RUNNING_ADDR + addr_offset);
+                    let vpn = addr::VirtualPageNumber::from(i);
                     let ppn = addr::PhysicalPageNumber::floor(task.start_addr + addr_offset);
                     let entry = page_table::PageTableEntry {
                         ppn: ppn,
