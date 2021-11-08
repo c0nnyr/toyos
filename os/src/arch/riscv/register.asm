@@ -7,3 +7,7 @@ load_time_asm:
 set_sie_bit_asm:
     csrrs a0, sie, a0
     ret
+set_satp_asm:
+    csrrw a0, satp, a0
+    sfence.vma #刷新TLB
+    ret

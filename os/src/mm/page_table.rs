@@ -65,15 +65,13 @@ pub struct PageTableTree {
     page_tables: [Option<PageTable>; BASE_PAGE_TABLE_COUNT], //先定义10个，不满足以后在像动态增加的办法
 }
 
-impl Default for PageTableTree {
-    fn default() -> Self {
+impl PageTableTree {
+    pub const fn default() -> Self {
         Self {
             page_tables: [None, None, None, None, None, None, None, None, None, None], //PageTable不是Copy的，所以不能用[None;BASE_PAGE_TABLE_COUNT]初始化
         }
     }
-}
 
-impl PageTableTree {
     pub fn init(&mut self) -> Result<(), &'static str> {
         self.page_tables[0] = Some(ppn_manager::PPN_MANAGER.lock().alloc()?.into());
         Ok(())
@@ -138,7 +136,7 @@ impl PageTableTree {
         for i in 0..offsets.len() - 1 {
             //统一处理前面len-1个offset，页目录
             let offset = offsets[i];
-            let mut entry = self.get_table_mut(cur_table_idx).unwrap().get_entry(offset);
+            let entry = self.get_table_mut(cur_table_idx).unwrap().get_entry(offset);
             if entry.valid {
                 cur_table_idx = self.find_table(entry.ppn).unwrap(); //此处必然应该能找到，定位到下一个table
             } else {
@@ -211,5 +209,9 @@ impl PageTableTree {
             }
             Err(err) => None,
         }
+    }
+
+    pub fn active(&self){
+        arch::page_table::active_page_table_root(self.page_tables[0].as_ref().unwrap().ppn.ppn);
     }
 }

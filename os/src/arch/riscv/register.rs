@@ -90,3 +90,24 @@ impl SIe {
         Self::set_bit(0x05); //STIE
     }
 }
+
+#[derive(Copy, Clone)]
+pub struct SAtp {
+    pub bits: usize,
+}
+
+impl SAtp {
+    pub fn set(&self) {
+        extern "C" {
+            fn set_satp_asm(satp: usize) -> usize;
+        }
+        unsafe {
+            set_satp_asm(self.bits);
+        }
+    }
+
+    pub fn from_ppn(ppn: usize) -> Self {
+        let mode = 8 << 60; //60~63位为mode，8表示使用Sv39模式，虚拟地址只使用低39位，高25位必须为0
+        Self{bits:mode | ppn}
+    }
+}

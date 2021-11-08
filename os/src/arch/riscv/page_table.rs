@@ -1,6 +1,8 @@
 use core::mem::size_of;
 
 use crate::mm::{addr, page_table};
+
+use super::register::SAtp;
 #[derive(Copy, Clone)]
 pub struct PageTableEntryImpl {
     bits: u64,
@@ -61,4 +63,8 @@ pub fn split_vpn(addr: usize) -> [usize; 3] {
         offsets[2 - i] = (addr >> i * 9) & 511; //提取9bit，最高9bit放在[0]，最低放在[2]
     }
     offsets
+}
+
+pub fn active_page_table_root(ppn:addr::PhysicalPageNumber){
+    SAtp::from_ppn(ppn.bits).set()
 }

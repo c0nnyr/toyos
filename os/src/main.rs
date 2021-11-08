@@ -11,35 +11,7 @@ fn main() {
     log::logger::LOGGER
         .lock()
         .init(log::logger::Level::Info, log::logger::LoggerType::SerialIO);
-    mm::ppn_manager::init();
-    {
-        let mut page_table_tree = PageTableTree::default();
-        page_table_tree.init().unwrap();
-        page_table_tree
-            .map(
-                addr::VirtualPageNumber::from(0x0),
-                PageTableEntry {
-                    ppn: addr::PhysicalPageNumber::from(0x1),
-                    valid: true,
-                    read: true,
-                    write: true,
-                    execute: true,
-                    user: true,
-                },
-            )
-            .unwrap();
-        kinfo!(
-            "translate 0 => 0x{:x}",
-            page_table_tree.translate(0).unwrap()
-        );
-        kinfo!(
-            "translate 1 => 0x{:x}",
-            page_table_tree.translate(1).unwrap()
-        );
-        kinfo!("unmap 0");
-        page_table_tree.unmap(addr::VirtualPageNumber::from(0x0));
-        kinfo!("translate 1 => {:?}", page_table_tree.translate(1));
-    }
+    mm::init();
     arch::trap::init();
     task::task_manager::init();
     arch::time::enable_time_interrupt();
