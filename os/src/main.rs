@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(global_asm)]
 
-use mm::ppn_manager::PPNManager;
+use mm::{addr, page_table::PageTableEntry, page_table::PageTableTree};
 
 use crate::arch::trap::{self, TrapContextStore};
 
@@ -13,19 +13,32 @@ fn main() {
         .init(log::logger::Level::Info, log::logger::LoggerType::SerialIO);
     mm::ppn_manager::init();
     {
-        //分配第一个页
-        let tmp1 = mm::ppn_manager::PPN_MANAGER.lock().alloc().unwrap();
-        kinfo!("alloc tmp1 {}", tmp1.ppn);
-        //分配第二个页
-        let tmp2 = mm::ppn_manager::PPN_MANAGER.lock().alloc().unwrap();
-        kinfo!("alloc tmp2 {}", tmp2.ppn);
-        //生命周期结束，释放第二个页、第一个页
-    }
-    {
-        //分配第三个页，这个时候复用上面第一个页（刚释放）
-        let tmp3 = mm::ppn_manager::PPN_MANAGER.lock().alloc().unwrap();
-        kinfo!("alloc tmp3 {}", tmp3.ppn);
-        //释放第三个页
+        let mut page_table_tree = PageTableTree::default();
+        page_table_tree.init().unwrap();
+        page_table_tree
+            .map(
+                addr::VirtualPageNumber::from(0x0),
+                PageTableEntry {
+                    ppn: addr::PhysicalPageNumber::from(0x1),
+                    valid: true,
+                    read: true,
+                    write: true,
+                    execute: true,
+                    user: true,
+                },
+            )
+            .unwrap();
+        kinfo!(
+            "translate 0 => 0x{:x}",
+            page_table_tree.translate(0).unwrap()
+        );
+        kinfo!(
+            "translate 1 => 0x{:x}",
+            page_table_tree.translate(1).unwrap()
+        );
+        kinfo!("unmap 0");
+        page_table_tree.unmap(addr::VirtualPageNumber::from(0x0));
+        kinfo!("translate 1 => {:?}", page_table_tree.translate(1));
     }
     arch::trap::init();
     task::task_manager::init();

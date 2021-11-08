@@ -54,3 +54,11 @@ impl PageTableImpl {
         }
     }
 }
+
+pub fn split_vpn(addr: usize) -> [usize; 3] {
+    let mut offsets = [0; 3];
+    for i in 0..3 {
+        offsets[2 - i] = (addr >> i * 9) & 511; //提取9bit，最高9bit放在[0]，最低放在[2]
+    }
+    offsets
+}
