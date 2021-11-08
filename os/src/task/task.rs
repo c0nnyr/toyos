@@ -16,14 +16,17 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new(start_addr: usize, end_addr: usize, stack_bottom: usize) -> Self {
+    pub fn new(start_addr: usize, end_addr: usize) -> Self {
         Task {
             start_addr,
             end_addr,
             trap_context: {
                 //初始化为这个task最初应该的样子
                 let mut ctx = trap::TrapContext::default();
-                ctx.set_sp(stack_bottom as u64);
+                ctx.set_sp(
+                    (super::task_manager::TASK_RUNNING_ADDR + super::task_manager::MAX_TASK_SIZE)
+                        as u64,
+                );
                 ctx.set_pc(super::task_manager::TASK_RUNNING_ADDR as u64);
                 ctx
             },
