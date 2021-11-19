@@ -34,11 +34,11 @@ impl TaskManager {
     }
 
     //Rust里面的错误，本质上也是个泛型枚举。这里我们的()是数据的类型，静态生命周期字符串引用&'static str（也就是字符串常量）是错误的类型
-    fn load_task_code(&self, idx: usize) -> Result<(), &'static str> {
+    fn load_task_code(&mut self, idx: usize) -> Result<(), &'static str> {
         if idx >= MAX_TASK_NUM {
             return Err("idx exceed max task num");
         }
-        match &self.tasks[idx] {
+        match &mut self.tasks[idx] {
             //避免拷贝，所以才加上个&
             Some(task) => {
                 kinfo!(
@@ -46,24 +46,8 @@ impl TaskManager {
                     idx,
                     time::get_now()
                 );
-
-                let kernel_page_table_tree = &mut mm::KERNEL_PAGE_TABLE_TREE.lock();
-                for i in 0..addr::VirtualPageNumber::floor(MAX_TASK_SIZE).bits {
-                    let addr_offset = addr::VirtualPageNumber::from(i).as_addr();
-                    //遍历task对应的页
-                    let vpn = addr::VirtualPageNumber::from(i);
-                    let ppn = addr::PhysicalPageNumber::floor(task.start_addr + addr_offset);
-                    let entry = page_table::PageTableEntry {
-                        ppn: ppn,
-                        valid: true,
-                        read: true,
-                        write: true,
-                        execute: true,
-                        user: true,
-                    };
-                    kernel_page_table_tree.map(vpn, entry).unwrap();
-                }
-                kernel_page_table_tree.active(); //真正启用地址映射
+                task.load_code()?;
+                task.map()?;
                 Ok(())
             }
             None => Err("no task to load"),
@@ -122,7 +106,15 @@ impl TaskManager {
 }
 
 pub static TASK_MANAGER: spin::Mutex<TaskManager> = spin::Mutex::new(TaskManager {
-    tasks: [None; MAX_TASK_NUM],
+    tasks: [
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+        None, None, None, None, None, None, None, None, None, None,
+    ],
     current_idx: 0,
 });
 

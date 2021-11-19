@@ -1,6 +1,7 @@
 pub mod addr;
 pub mod page_table;
 pub mod ppn_manager;
+pub mod raw_page;
 pub mod section;
 use crate::task::task_manager;
 
@@ -70,7 +71,7 @@ fn init_kernel_map() {
         (
             //这块内存用于动态分配，同时应用程序的数量也放在TASK_RUNNING_ADDR的位置呢
             kernel_end_asm as usize,
-            (task_manager::TASK_RUNNING_ADDR + task_manager::MAX_TASK_SIZE) as usize,
+            (task_manager::TASK_RUNNING_ADDR + 10 * task_manager::MAX_TASK_SIZE) as usize,
             section::MapTarget::Identity,
             section::DATA_PERMISSION.for_kernel(),
         ),
@@ -78,7 +79,7 @@ fn init_kernel_map() {
 
     for item in section_def {
         let section = section::VirtualSection::new(item.0, item.1, item.2, item.3);
-        for (vpn, entry) in section.iter() {
+        for (vpn, entry, _) in section.iter() {
             kernel_page_table_tree.map(vpn, entry);
         }
     }

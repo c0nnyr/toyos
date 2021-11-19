@@ -1,4 +1,10 @@
-use crate::arch::trap::{self, TrapContextStore}; //引入TrapContextStore才能使用TrapContext身上对这个trait的实现
+use crate::{
+    arch::trap::{self, TrapContextStore},
+    mm::{
+        self, addr, page_table, raw_page,
+        section::{self, DATA_PERMISSION},
+    },
+}; //引入TrapContextStore才能使用TrapContext身上对这个trait的实现
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum TaskState {
@@ -7,12 +13,16 @@ pub enum TaskState {
     Stopped,
 }
 
-#[derive(Clone, Copy)]
 pub struct Task {
     pub start_addr: usize,
     end_addr: usize,
     trap_context: trap::TrapContext,
     state: TaskState,
+    raw_pages: [Option<(
+        addr::VirtualPageNumber,
+        page_table::PageTableEntry,
+        raw_page::RawPage,
+    )>; 100], //暂时先用20个来撑一下
 }
 
 impl Task {
@@ -20,13 +30,18 @@ impl Task {
         Task {
             start_addr,
             end_addr,
-            trap_context: {
-                //初始化为这个task最初应该的样子
-                let mut ctx = trap::TrapContext::default();
-                ctx.set_sp((super::task_manager::MAX_TASK_SIZE) as u64);
-                ctx
-            },
+            trap_context: trap::TrapContext::default(),
             state: TaskState::Init,
+            raw_pages: [
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None,
+            ],
         }
     }
 
@@ -55,5 +70,86 @@ impl Task {
 
     pub fn is_runnable(&self) -> bool {
         self.state == TaskState::Init || self.state == TaskState::Running
+    }
+
+    fn save_raw_page(
+        &mut self,
+        vpn: addr::VirtualPageNumber,
+        entry: page_table::PageTableEntry,
+        raw_page: raw_page::RawPage,
+    ) -> Result<(), &'static str> {
+        for (i, item) in self.raw_pages.iter().enumerate() {
+            if item.is_none() {
+                self.raw_pages[i] = Some((vpn, entry, raw_page));
+                return Ok(());
+            }
+        }
+        Err("failed to save raw page")
+    }
+
+    pub fn load_code(&mut self) -> Result<(), &'static str> {
+        if self.raw_pages[0].is_none() {
+            let raw_data = unsafe {
+                core::slice::from_raw_parts(
+                    self.start_addr as *const u8,
+                    self.end_addr - self.start_addr,
+                )
+            };
+            let elf = xmas_elf::ElfFile::new(raw_data)?;
+            let elf_header = elf.header;
+            let ph_count = elf_header.pt2.ph_count();
+            let mut max_end_vpn = addr::VirtualPageNumber::from(0); //之后用于计算代码的上限，选择虚拟地址中合适的栈开始位置
+            for i in 0..ph_count {
+                let ph = elf.program_header(i).unwrap();
+                if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
+                    let permission = crate::mm::section::Permission {
+                        user: true,
+                        read: ph.flags().is_read(),
+                        write: ph.flags().is_write(),
+                        execute: ph.flags().is_execute(),
+                    };
+                    let data: &[u8] =
+                        &elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize];
+                    let section = section::VirtualSection::new(
+                        ph.virtual_addr() as usize,
+                        (ph.virtual_addr() + ph.mem_size()) as usize,
+                        section::MapTarget::Random(Some(data)),
+                        permission,
+                    );
+                    for (vpn, entry, raw_page) in section.iter() {
+                        self.save_raw_page(vpn, entry, raw_page.unwrap())?;
+                    }
+                    if section.end_vpn.bits > max_end_vpn.bits {
+                        max_end_vpn = section.end_vpn;
+                    }
+                }
+            }
+            let stack_vpn = addr::VirtualPageNumber::from(max_end_vpn.bits);
+            let section = section::VirtualSection {
+                start_vpn: stack_vpn,
+                end_vpn: addr::VirtualPageNumber::from(stack_vpn.bits + 1), //4K
+                map_target: section::MapTarget::Random(None),
+                permission: DATA_PERMISSION.for_user(),
+            };
+            for (vpn, entry, raw_page) in section.iter() {
+                self.save_raw_page(vpn, entry, raw_page.unwrap())?;
+            }
+            let entry_addr = elf_header.pt2.entry_point();
+
+            self.trap_context.set_pc(entry_addr);
+            self.trap_context.set_sp(section.end_vpn.as_addr() as u64);
+        }
+        Ok(())
+    }
+
+    pub fn map(&mut self) -> Result<(), &'static str> {
+        let kernel_page_table_tree = &mut mm::KERNEL_PAGE_TABLE_TREE.lock();
+        for item in self.raw_pages.iter().as_ref() {
+            if let Some(item) = item {
+                kernel_page_table_tree.map(item.0, item.1)?;
+            }
+        }
+        kernel_page_table_tree.active(); //真正启用地址映射
+        Ok(())
     }
 }

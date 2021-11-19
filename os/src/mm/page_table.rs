@@ -7,7 +7,7 @@ use crate::arch::{
     page_table::{self, PageTableImpl},
 };
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct PageTableEntry {
     pub ppn: addr::PhysicalPageNumber,
     pub valid: bool,   //页表项是否有效
@@ -60,7 +60,7 @@ impl From<ppn_manager::PhysicalPageNumberGuard> for PageTable {
     }
 }
 
-const BASE_PAGE_TABLE_COUNT: usize = 10;
+const BASE_PAGE_TABLE_COUNT: usize = 20;
 pub struct PageTableTree {
     page_tables: [Option<PageTable>; BASE_PAGE_TABLE_COUNT], //先定义10个，不满足以后在像动态增加的办法
 }
@@ -68,7 +68,10 @@ pub struct PageTableTree {
 impl PageTableTree {
     pub const fn default() -> Self {
         Self {
-            page_tables: [None, None, None, None, None, None, None, None, None, None], //PageTable不是Copy的，所以不能用[None;BASE_PAGE_TABLE_COUNT]初始化
+            page_tables: [
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None, None, None, None, None,
+            ], //PageTable不是Copy的，所以不能用[None;BASE_PAGE_TABLE_COUNT]初始化
         }
     }
 

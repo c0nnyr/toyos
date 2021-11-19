@@ -64,9 +64,8 @@ impl PPNManager for PPNManagerImpl {
             //遍历，获取一页没有占用的
             if !self.bitmap[i] {
                 self.bitmap[i] = true;
-                return Ok(PhysicalPageNumberGuard {
-                    ppn: addr::PhysicalPageNumber::from(self.start_ppn.unwrap().bits + i),
-                });
+                let ppn = addr::PhysicalPageNumber::from(self.start_ppn.unwrap().bits + i);
+                return Ok(PhysicalPageNumberGuard { ppn });
             }
         }
         Err("failed to alloc")
