@@ -24,8 +24,12 @@ SECTIONS
     }
     kernel_data_end_asm = .;
     . = ALIGN(4K);
-    kernel_bss_start_asm = .;
+
+    # 留出 4K的空间，用于做GAP。将来不会对这块区域做地址映射
+    kernel_bss_start_asm = . + 4K;
+    . = kernel_bss_start_asm;
     .bss : {
+        *(.bss.boot_stack) # 将栈放在最前面
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     }

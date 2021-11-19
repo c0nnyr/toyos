@@ -124,7 +124,7 @@ impl Task {
                     }
                 }
             }
-            let stack_vpn = addr::VirtualPageNumber::from(max_end_vpn.bits);
+            let stack_vpn = addr::VirtualPageNumber::from(max_end_vpn.bits+1);//留出4K的保护区间
             let section = section::VirtualSection {
                 start_vpn: stack_vpn,
                 end_vpn: addr::VirtualPageNumber::from(stack_vpn.bits + 1), //4K
