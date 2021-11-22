@@ -103,6 +103,13 @@ impl TaskManager {
             None => panic!("never here"),
         }
     }
+
+    pub fn get_cur_task_page_table_root_ppn(&self) -> addr::PhysicalPageNumber {
+        self.tasks[self.current_idx]
+            .as_ref()
+            .unwrap()
+            .get_page_table_root_ppn()
+    }
 }
 
 pub static TASK_MANAGER: spin::Mutex<TaskManager> = spin::Mutex::new(TaskManager {

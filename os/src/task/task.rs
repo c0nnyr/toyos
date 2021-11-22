@@ -1,7 +1,9 @@
 use crate::{
     arch::trap::{self, TrapContextStore},
     mm::{
-        self, addr, page_table, raw_page,
+        self, addr,
+        page_table::{self, PageTableTree},
+        raw_page,
         section::{self, DATA_PERMISSION},
     },
 }; //引入TrapContextStore才能使用TrapContext身上对这个trait的实现
@@ -23,6 +25,7 @@ pub struct Task {
         page_table::PageTableEntry,
         raw_page::RawPage,
     )>; 100], //暂时先用20个来撑一下
+    page_table_tree: page_table::PageTableTree,
 }
 
 impl Task {
@@ -42,6 +45,7 @@ impl Task {
                 None, None, None, None, None, None, None, None, None, None, None, None, None, None,
                 None, None,
             ],
+            page_table_tree: page_table::PageTableTree::default(),
         }
     }
 
@@ -89,6 +93,7 @@ impl Task {
 
     pub fn load_code(&mut self) -> Result<(), &'static str> {
         if self.raw_pages[0].is_none() {
+            self.page_table_tree.init()?;
             let raw_data = unsafe {
                 core::slice::from_raw_parts(
                     self.start_addr as *const u8,
@@ -124,7 +129,7 @@ impl Task {
                     }
                 }
             }
-            let stack_vpn = addr::VirtualPageNumber::from(max_end_vpn.bits+1);//留出4K的保护区间
+            let stack_vpn = addr::VirtualPageNumber::from(max_end_vpn.bits + 1); //留出4K的保护区间
             let section = section::VirtualSection {
                 start_vpn: stack_vpn,
                 end_vpn: addr::VirtualPageNumber::from(stack_vpn.bits + 1), //4K
@@ -143,13 +148,45 @@ impl Task {
     }
 
     pub fn map(&mut self) -> Result<(), &'static str> {
-        let kernel_page_table_tree = &mut mm::KERNEL_PAGE_TABLE_TREE.lock();
         for item in self.raw_pages.iter().as_ref() {
             if let Some(item) = item {
-                kernel_page_table_tree.map(item.0, item.1)?;
+                self.page_table_tree.map(item.0, item.1)?;
             }
         }
-        kernel_page_table_tree.active(); //真正启用地址映射
+        extern "C" {
+            fn kernel_text_trap_start_asm();
+            fn kernel_text_trap_end_asm();
+            fn kernel_bss_trap_start_asm();
+            fn kernel_bss_trap_end_asm();
+        }
+        //映射trap
+        let section_def = [
+            (
+                kernel_bss_trap_start_asm as usize,
+                kernel_bss_trap_end_asm as usize,
+                section::MapTarget::Identity,
+                section::BSS_PERMISSION.for_kernel(),
+            ),
+            (
+                kernel_text_trap_start_asm as usize,
+                kernel_text_trap_end_asm as usize,
+                section::MapTarget::Identity,
+                section::TEXT_PERMISSION.for_kernel(),
+            ),
+        ];
+
+        for item in section_def {
+            let section = section::VirtualSection::new(item.0, item.1, item.2, item.3);
+            for (vpn, entry, _) in section.iter() {
+                self.page_table_tree.map(vpn, entry);
+            }
+        }
+        self.trap_context
+            .set_page_table_root_ppn(self.get_page_table_root_ppn().bits as u64);
         Ok(())
+    }
+
+    pub fn get_page_table_root_ppn(&self) -> addr::PhysicalPageNumber {
+        self.page_table_tree.get_root_ppn()
     }
 }

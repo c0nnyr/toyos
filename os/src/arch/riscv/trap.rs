@@ -1,16 +1,24 @@
+use crate::arch::riscv::register;
 use crate::arch::syscall;
 use crate::arch::trap;
+use crate::arch::trap::TrapContextStore;
+use crate::task::task_manager::TASK_MANAGER;
 global_asm!(include_str!("trap.asm"));
 
 #[repr(C)]
 #[derive(Copy, Clone)] //这样就能正常拷贝了。Copy+Clone说明使用=的时候，不是使用move语义转移所有权，而是拷贝一份
 pub struct TrapContextStoreImpl {
     //需要保存32寄存器，以及sepc
-    //x0..=x32, sepc，一共33个
-    ctx: [u64; 33], //使用数组，方便直接汇编的时候操作，免得有对齐的问题
+    //x0..=x32, sepc，satp 一共34个
+    ctx: [u64; 34], //使用数组，方便直接汇编的时候操作，免得有对齐的问题
 }
 
 impl trap::TrapContextStore for TrapContextStoreImpl {
+    fn set_page_table_root_ppn(&mut self, root: u64) {
+        let satp = register::SAtp::from_ppn(root as usize);
+        self.ctx[33] = satp.bits as u64;
+    }
+
     fn set_sp(&mut self, sp: u64) {
         self.ctx[2] = sp; //x2就是sp
     }
@@ -49,7 +57,7 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
 }
 impl Default for TrapContextStoreImpl {
     fn default() -> Self {
-        TrapContextStoreImpl { ctx: [0; 33] }
+        TrapContextStoreImpl { ctx: [0; 34] }
     }
 }
 
@@ -72,5 +80,9 @@ pub fn init() {
 
 #[no_mangle]
 fn trap_entry(ctx: &mut TrapContextStoreImpl) {
+    {
+        let root_ppn = TASK_MANAGER.lock().get_cur_task_page_table_root_ppn();
+        ctx.set_page_table_root_ppn(root_ppn.bits as u64);
+    }
     *ctx = *trap::dispatch_trap(&mut trap::TrapContext::new(ctx)).raw();
 }
