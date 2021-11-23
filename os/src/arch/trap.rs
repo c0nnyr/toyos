@@ -5,6 +5,7 @@ use crate::task::task_manager;
 
 use super::riscv::register;
 use super::riscv::trap;
+use super::riscv::trap::TrapContextStoreImpl;
 
 #[derive(Debug)] //方便打印
 pub enum Exception {
@@ -41,17 +42,16 @@ pub trait TrapContextStore: Default {
     fn restore_trap(&self) -> !;
     fn get_syscall_param(&self) -> syscall::SyscallParam;
     fn set_syscall_return_code(&mut self, code: usize);
-    fn set_page_table_root_ppn(&mut self, root: u64);
+    fn set_page_table_root_ppn(&mut self, root_user: u64, root_kernel: u64);
 }
 
-#[derive(Clone, Copy)]
 pub struct TrapContext {
-    store: trap::TrapContextStoreImpl,
+    store: &'static mut trap::TrapContextStoreImpl,
 }
 
 impl TrapContextStore for TrapContext {
-    fn set_page_table_root_ppn(&mut self, root: u64) {
-        self.store.set_page_table_root_ppn(root)
+    fn set_page_table_root_ppn(&mut self, root_user: u64, root_kernel: u64) {
+        self.store.set_page_table_root_ppn(root_user, root_kernel)
     }
     fn set_sp(&mut self, sp: u64) {
         self.store.set_sp(sp)
@@ -73,19 +73,11 @@ impl TrapContextStore for TrapContext {
     }
 }
 
-impl Default for TrapContext {
-    fn default() -> Self {
-        TrapContext {
-            store: trap::TrapContextStoreImpl::default(),
-        }
-    }
-}
-
 impl TrapContext {
-    pub fn new(store: &trap::TrapContextStoreImpl) -> Self {
-        TrapContext { store: *store }
+    pub fn new(store: &'static mut trap::TrapContextStoreImpl) -> Self {
+        TrapContext { store: store }
     }
-    pub fn raw(&self) -> &trap::TrapContextStoreImpl {
+    pub fn raw(&self) -> &'static trap::TrapContextStoreImpl {
         &self.store
     }
 }
@@ -94,11 +86,11 @@ pub fn init() {
     trap::init();
 }
 
-fn build_next_trap_context() -> TrapContext {
+fn build_next_trap_context() -> &'static TrapContext {
     let mut task_manager = task_manager::TASK_MANAGER.lock();
     let current_idx = task_manager.get_current_idx();
     match task_manager.switch_to_next_task(current_idx + 1) {
-        Ok(_) => task_manager.get_current_trap_context(),
+        Ok(_) => task_manager.get_current_trap_context().raw(),
         Err(_) => {
             kinfo!("Legacy shutdown now!"); //没有更多应用了
             ecall::shutdown();
@@ -106,7 +98,7 @@ fn build_next_trap_context() -> TrapContext {
     }
 }
 
-pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
+pub fn dispatch_trap(ctx: &mut TrapContext) -> &'static TrapContextStoreImpl {
     let cause = TrapCause::get_current_cause();
     let set_current_task_state = |state: task::TaskState| {
         task_manager::TASK_MANAGER.lock().set_current_state(state);
@@ -139,7 +131,6 @@ pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
                     }
                     _ => {
                         let return_code = syscall_param.dispatch_syscall();
-                        let mut ctx = *ctx; //拷贝一份，注意这里需要给TrapContext增加Copy/Clone
                         ctx.set_syscall_return_code(return_code);
                         ctx.mv_pc_to_next();
                         ctx

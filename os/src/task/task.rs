@@ -1,8 +1,11 @@
+use core::mem::size_of;
+
 use crate::{
     arch::trap::{self, TrapContextStore},
     mm::{
         self, addr,
         page_table::{self, PageTableTree},
+        ppn_manager::{self, PPNManager},
         raw_page,
         section::{self, DATA_PERMISSION},
     },
@@ -15,10 +18,77 @@ pub enum TaskState {
     Stopped,
 }
 
+const KERNEL_STACK_PAGE_NUM: usize = 2;
+pub struct KernelStackPage {
+    ppn: ppn_manager::PhysicalPageNumberGuard,
+    raw: &'static mut [u8; addr::PAGE_SIZE],
+}
+
+impl From<ppn_manager::PhysicalPageNumberGuard> for KernelStackPage {
+    fn from(v: ppn_manager::PhysicalPageNumberGuard) -> Self {
+        let raw = unsafe {
+            (v.ppn.as_addr() as *mut [u8; addr::PAGE_SIZE])
+                .as_mut()
+                .unwrap()
+        };
+        Self { ppn: v, raw }
+    }
+}
+
+impl KernelStackPage {
+    //KernelStackPage高地址存放trapcontext
+    pub fn get_trap_context(&self) -> &trap::TrapContext {
+        unsafe {
+            (self
+                .raw
+                .as_ptr()
+                .add(self.raw.len() - size_of::<trap::TrapContextStoreImpl>())
+                as *const trap::TrapContextStoreImpl)
+                .as_ref()
+                .unwrap()
+        }
+    }
+
+    pub fn get_trap_context_mut(&mut self) -> &'static mut trap::TrapContext {
+        unsafe {
+            (self
+                .raw
+                .as_ptr()
+                .add(self.raw.len() - size_of::<trap::TrapContext>())
+                as *mut trap::TrapContext)
+                .as_mut()
+                .unwrap()
+        }
+    }
+}
+
+pub struct KernelStack {
+    kernel_stack: [KernelStackPage; KERNEL_STACK_PAGE_NUM],
+}
+
+impl KernelStack {
+    pub fn init() -> Result<Self, &'static str> {
+        let ppn_manager_inner = ppn_manager::PPN_MANAGER.lock();
+        Ok(Self {
+            kernel_stack: [
+                ppn_manager_inner.alloc()?.into(),
+                ppn_manager_inner.alloc()?.into(),
+            ],
+        })
+    }
+
+    pub fn get_trap_context(&self) -> &trap::TrapContext {
+        self.kernel_stack[0].get_trap_context()
+    }
+
+    pub fn get_trap_context_mut(&mut self) -> &mut trap::TrapContext {
+        self.kernel_stack[0].get_trap_context_mut()
+    }
+}
+
 pub struct Task {
     pub start_addr: usize,
     end_addr: usize,
-    trap_context: trap::TrapContext,
     state: TaskState,
     raw_pages: [Option<(
         addr::VirtualPageNumber,
@@ -26,14 +96,22 @@ pub struct Task {
         raw_page::RawPage,
     )>; 100], //暂时先用20个来撑一下
     page_table_tree: page_table::PageTableTree,
+    kernel_stack: KernelStack,
 }
 
 impl Task {
     pub fn new(start_addr: usize, end_addr: usize) -> Self {
+        let kernel_stack = KernelStack::init().unwrap();
+
+        // let section = section::VirtualSection::new(addr::TOPEST_ADDR - addr::PAGE_SIZE*);
+        // for (vpn, entry, _) in section.iter() {
+        //     self.page_table_tree.map(vpn, entry);
+        // }
+
         Task {
             start_addr,
             end_addr,
-            trap_context: trap::TrapContext::default(),
+            // trap_context: trap::TrapContext::default(),
             state: TaskState::Init,
             raw_pages: [
                 None, None, None, None, None, None, None, None, None, None, None, None, None, None,
@@ -46,6 +124,7 @@ impl Task {
                 None, None,
             ],
             page_table_tree: page_table::PageTableTree::default(),
+            kernel_stack,
         }
     }
 
@@ -60,12 +139,12 @@ impl Task {
         }
     }
 
-    pub fn get_trap_context(&self) -> trap::TrapContext {
-        self.trap_context
+    pub fn get_trap_context(&self) -> &trap::TrapContext {
+        self.kernel_stack.get_trap_context()
     }
 
     pub fn save_trap_context(&mut self, ctx: &trap::TrapContext) {
-        self.trap_context = *ctx;
+        *self.kernel_stack.get_trap_context_mut() = *ctx
     }
 
     pub fn set_state(&mut self, state: TaskState) {
@@ -141,8 +220,10 @@ impl Task {
             }
             let entry_addr = elf_header.pt2.entry_point();
 
-            self.trap_context.set_pc(entry_addr);
-            self.trap_context.set_sp(section.end_vpn.as_addr() as u64);
+            self.kernel_stack.get_trap_context_mut().set_pc(entry_addr);
+            self.kernel_stack
+                .get_trap_context_mut()
+                .set_sp(section.end_vpn.as_addr() as u64);
         }
         Ok(())
     }
@@ -181,8 +262,12 @@ impl Task {
                 self.page_table_tree.map(vpn, entry);
             }
         }
-        self.trap_context
-            .set_page_table_root_ppn(self.get_page_table_root_ppn().bits as u64);
+        self.kernel_stack
+            .get_trap_context_mut()
+            .set_page_table_root_ppn(
+                self.get_page_table_root_ppn().bits as u64,
+                mm::KERNEL_PAGE_TABLE_TREE.lock().get_root_ppn().bits,
+            );
         Ok(())
     }
 

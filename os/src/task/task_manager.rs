@@ -83,7 +83,7 @@ impl TaskManager {
         self.current_idx
     }
 
-    pub fn get_current_trap_context(&self) -> trap::TrapContext {
+    pub fn get_current_trap_context(&self) -> &trap::TrapContext {
         match &self.tasks[self.current_idx] {
             Some(task) => task.get_trap_context(),
             None => panic!("never here"),
