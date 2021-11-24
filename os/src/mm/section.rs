@@ -54,6 +54,7 @@ impl Permission {
 pub enum MapTarget<'a> {
     Identity,
     Random(Option<&'a [u8]>),
+    BiasPageNumber(i32),
 }
 
 // [start_vpn, end_vpn)
@@ -121,6 +122,10 @@ impl Iterator for VirtualSectionIter<'_> {
                     }
                     (raw_page.ppn.ppn, Some(raw_page))
                 }
+                MapTarget::BiasPageNumber(bias) => (
+                    addr::PhysicalPageNumber::from((ret.bits as i32 + bias) as usize),
+                    None,
+                ),
             };
             let entry = page_table::PageTableEntry {
                 ppn: ppn,

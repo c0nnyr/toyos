@@ -1,4 +1,4 @@
-use core::mem::size_of;
+use core::mem::{self, size_of};
 
 use crate::{
     arch::trap::{self, TrapContextStore},
@@ -21,6 +21,7 @@ pub enum TaskState {
 
 const KERNEL_STACK_PAGE_NUM: usize = 2;
 pub struct KernelStackPage {
+    vpn: Option<addr::VirtualPageNumber>,
     ppn: ppn_manager::PhysicalPageNumberGuard,
     raw: &'static mut [u8; addr::PAGE_SIZE],
 }
@@ -32,34 +33,17 @@ impl From<ppn_manager::PhysicalPageNumberGuard> for KernelStackPage {
                 .as_mut()
                 .unwrap()
         };
-        Self { ppn: v, raw }
+        Self {
+            ppn: v,
+            raw,
+            vpn: None,
+        }
     }
 }
 
 impl KernelStackPage {
-    //KernelStackPage高地址存放trapcontext
-    pub fn get_trap_context(&self) -> &'static trap::TrapContext {
-        unsafe {
-            (self
-                .raw
-                .as_ptr()
-                .add(self.raw.len() - size_of::<trap::TrapContext>())
-                as *const trap::TrapContext)
-                .as_ref()
-                .unwrap()
-        }
-    }
-
-    pub fn get_trap_context_mut(&mut self) -> &'static mut trap::TrapContext {
-        unsafe {
-            (self
-                .raw
-                .as_ptr()
-                .add(self.raw.len() - size_of::<trap::TrapContext>())
-                as *mut trap::TrapContext)
-                .as_mut()
-                .unwrap()
-        }
+    fn bind_vpn(&mut self, vpn: addr::VirtualPageNumber) {
+        self.vpn = Some(vpn);
     }
 }
 
@@ -78,16 +62,50 @@ impl KernelStack {
         })
     }
 
+    pub fn bind_vpn(&mut self, vpn_end: addr::VirtualPageNumber) {
+        for (idx, kernel_stack_page) in self.kernel_stack.iter_mut().rev().enumerate() {
+            kernel_stack_page.bind_vpn(addr::VirtualPageNumber::from(vpn_end.bits - idx - 1));
+        }
+    }
+    //KernelStackPage高地址存放trapcontext
     pub fn get_trap_context(&self) -> &'static trap::TrapContext {
-        self.kernel_stack[0].get_trap_context()
+        unsafe {
+            ((self.kernel_stack.last().unwrap().vpn.unwrap().as_addr() + PAGE_SIZE
+                - size_of::<trap::TrapContext>()) as *const trap::TrapContext)
+                .as_ref()
+                .unwrap()
+        }
     }
 
     pub fn get_trap_context_mut(&mut self) -> &'static mut trap::TrapContext {
-        self.kernel_stack[0].get_trap_context_mut()
+        unsafe {
+            ((self.kernel_stack.last().unwrap().vpn.unwrap().as_addr() + PAGE_SIZE
+                - size_of::<trap::TrapContext>()) as *mut trap::TrapContext)
+                .as_mut()
+                .unwrap()
+        }
+    }
+    pub fn map_in_kernel(&self) -> Result<(), &'static str> {
+        let kernel_page_table = &mut mm::KERNEL_PAGE_TABLE_TREE.lock();
+        for kernel_stack in self.kernel_stack.iter() {
+            let section = section::VirtualSection::new(
+                kernel_stack.vpn.unwrap().as_addr(),
+                kernel_stack.vpn.unwrap().as_addr() + addr::PAGE_SIZE,
+                section::MapTarget::BiasPageNumber(
+                    kernel_stack.ppn.ppn.bits as i32 - kernel_stack.vpn.unwrap().bits as i32,
+                ),
+                section::DATA_PERMISSION.for_kernel(),
+            );
+            for (vpn, entry, _) in section.iter() {
+                kernel_page_table.map(vpn, entry)?;
+            }
+        }
+        Ok(())
     }
 }
 
 pub struct Task {
+    idx: usize,
     pub start_addr: usize,
     end_addr: usize,
     state: TaskState,
@@ -101,7 +119,7 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new(start_addr: usize, end_addr: usize) -> Self {
+    pub fn new(idx: usize, start_addr: usize, end_addr: usize) -> Self {
         let kernel_stack = KernelStack::init().unwrap();
 
         // let section = section::VirtualSection::new(addr::TOPEST_ADDR - addr::PAGE_SIZE*);
@@ -109,7 +127,8 @@ impl Task {
         //     self.page_table_tree.map(vpn, entry);
         // }
 
-        Task {
+        let mut task = Task {
+            idx,
             start_addr,
             end_addr,
             // trap_context: trap::TrapContext::default(),
@@ -126,7 +145,22 @@ impl Task {
             ],
             page_table_tree: page_table::PageTableTree::default(),
             kernel_stack,
-        }
+        };
+        task.kernel_stack.bind_vpn(addr::VirtualPageNumber::ceil(
+            task.get_kernel_stack_top_virtual_addr(),
+        ));
+        task.kernel_stack.map_in_kernel().unwrap();
+        task.kernel_stack
+            .get_trap_context_mut()
+            .set_trap_entry(trap::trap_entry as u64);
+        task.page_table_tree.init().unwrap();
+        task.kernel_stack
+            .get_trap_context_mut()
+            .set_page_table_root_ppn(
+                task.get_page_table_root_ppn().bits as u64,
+                mm::KERNEL_PAGE_TABLE_TREE.lock().get_root_ppn().bits as u64,
+            );
+        task
     }
 
     pub fn get_code(&self) -> &[u8] {
@@ -141,6 +175,7 @@ impl Task {
     }
 
     pub fn get_trap_context(&self) -> &'static trap::TrapContext {
+        //需要确保映射好了在调用，也就是在taks.map后调用
         self.kernel_stack.get_trap_context()
     }
 
@@ -169,7 +204,6 @@ impl Task {
 
     pub fn load_code(&mut self) -> Result<(), &'static str> {
         if self.raw_pages[0].is_none() {
-            self.page_table_tree.init()?;
             let raw_data = unsafe {
                 core::slice::from_raw_parts(
                     self.start_addr as *const u8,
@@ -225,6 +259,13 @@ impl Task {
         Ok(())
     }
 
+    pub fn get_kernel_stack_top_virtual_addr(&self) -> usize {
+        return addr::TOPEST_ADDR + 1
+            - self.idx * self.kernel_stack.kernel_stack.len() * PAGE_SIZE
+            - PAGE_SIZE
+            - mem::size_of::<trap::TrapContext>();
+    }
+
     pub fn map(&mut self) -> Result<(), &'static str> {
         for item in self.raw_pages.iter().as_ref() {
             if let Some(item) = item {
@@ -237,9 +278,12 @@ impl Task {
         }
         //映射trap
         let section_def = [(
-            kernel_text_trap_start_asm as usize,
-            kernel_text_trap_end_asm as usize,
-            section::MapTarget::Identity,
+            addr::TOPEST_ADDR - PAGE_SIZE + 1,
+            addr::TOPEST_ADDR + 1,
+            section::MapTarget::BiasPageNumber(
+                addr::PhysicalPageNumber::floor(kernel_text_trap_start_asm as usize).bits as i32
+                    - addr::VirtualPageNumber::floor(addr::TOPEST_ADDR - PAGE_SIZE + 1).bits as i32,
+            ),
             section::TEXT_PERMISSION.for_kernel(),
         )];
 
@@ -250,23 +294,35 @@ impl Task {
             }
         }
 
-        for kernel_stack in self.kernel_stack.kernel_stack.iter() {
+        for (idx, kernel_stack) in self.kernel_stack.kernel_stack.iter().enumerate() {
             let section = section::VirtualSection::new(
-                kernel_stack.ppn.as_addr(),
-                kernel_stack.ppn.as_addr() + PAGE_SIZE,
-                section::MapTarget::Identity,
+                kernel_stack.vpn.unwrap().as_addr(),
+                kernel_stack.vpn.unwrap().as_addr() + addr::PAGE_SIZE,
+                section::MapTarget::BiasPageNumber(
+                    kernel_stack.ppn.ppn.bits as i32 - kernel_stack.vpn.unwrap().bits as i32,
+                ),
                 section::DATA_PERMISSION.for_kernel(),
             );
             for (vpn, entry, _) in section.iter() {
                 self.page_table_tree.map(vpn, entry);
             }
         }
-        self.kernel_stack
-            .get_trap_context_mut()
-            .set_page_table_root_ppn(
-                self.get_page_table_root_ppn().bits as u64,
-                mm::KERNEL_PAGE_TABLE_TREE.lock().get_root_ppn().bits as u64,
-            );
+        kinfo!(
+            "map 0x{:x} to 0x{:x}",
+            addr::TOPEST_ADDR - PAGE_SIZE + 1,
+            mm::KERNEL_PAGE_TABLE_TREE
+                .lock()
+                .translate(addr::TOPEST_ADDR - PAGE_SIZE + 1)
+                .unwrap()
+        );
+        kinfo!(
+            "map 0x{:x} to 0x{:x}",
+            addr::TOPEST_ADDR - PAGE_SIZE + 1 - mem::size_of::<trap::TrapContext>(),
+            mm::KERNEL_PAGE_TABLE_TREE
+                .lock()
+                .translate(addr::TOPEST_ADDR - PAGE_SIZE + 1 - mem::size_of::<trap::TrapContext>())
+                .unwrap()
+        );
         Ok(())
     }
 

@@ -26,6 +26,9 @@ fn init_kernel_map() {
         fn kernel_bss_start_asm();
         fn kernel_bss_end_asm();
         fn kernel_end_asm();
+
+        fn kernel_text_trap_start_asm();
+        fn kernel_text_trap_end_asm();
     }
     kinfo!("kernel_text_start: 0x{:x}", kernel_text_start_asm as usize);
     kinfo!("kernel_text_end: 0x{:x}", kernel_text_end_asm as usize);
@@ -39,6 +42,14 @@ fn init_kernel_map() {
     kinfo!("kernel_bss_start: 0x{:x}", kernel_bss_start_asm as usize);
     kinfo!("kernel_bss_end: 0x{:x}", kernel_bss_end_asm as usize);
     kinfo!("kernel_end: 0x{:x}", kernel_end_asm as usize);
+    kinfo!(
+        "kernel_text_trap_start_asm: 0x{:x}",
+        kernel_text_trap_start_asm as usize
+    );
+    kinfo!(
+        "kernel_text_trap_end_asm: 0x{:x}",
+        kernel_text_trap_end_asm as usize
+    );
 
     let kernel_page_table_tree = &mut KERNEL_PAGE_TABLE_TREE.lock();
     kernel_page_table_tree.init().unwrap();
@@ -74,6 +85,16 @@ fn init_kernel_map() {
             (task_manager::TASK_RUNNING_ADDR + 10 * task_manager::MAX_TASK_SIZE) as usize,
             section::MapTarget::Identity,
             section::DATA_PERMISSION.for_kernel(),
+        ),
+        (
+            addr::TOPEST_ADDR - addr::PAGE_SIZE + 1,
+            addr::TOPEST_ADDR + 1,
+            section::MapTarget::BiasPageNumber(
+                addr::PhysicalPageNumber::floor(kernel_text_trap_start_asm as usize).bits as i32
+                    - addr::VirtualPageNumber::floor(addr::TOPEST_ADDR - addr::PAGE_SIZE + 1).bits
+                        as i32,
+            ),
+            section::TEXT_PERMISSION.for_kernel(),
         ),
     ];
 

@@ -27,6 +27,7 @@ impl TaskManager {
         for i in 0..task_num {
             //从 TASK_RUNNING_ADDR + MAX_TASK_SIZE开始是第一个应用，每个应用MAX_TASK_SIZE大小
             self.tasks[i] = Some(task::Task::new(
+                i,
                 TASK_RUNNING_ADDR + (i + 1) * MAX_TASK_SIZE,
                 TASK_RUNNING_ADDR + (i + 2) * MAX_TASK_SIZE,
             ));

@@ -1,6 +1,6 @@
 pub const PAGE_SIZE_BIT: usize = 12;
 pub const PAGE_SIZE: usize = 1 << PAGE_SIZE_BIT; // 4K
-pub const TOPEST_ADDR: usize = 1 << 32 - 1;
+pub const TOPEST_ADDR: usize = (1 << 32) - 1;
 
 #[derive(Copy, Clone, Debug)]
 pub struct PhysicalPageNumber {

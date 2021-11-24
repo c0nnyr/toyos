@@ -43,6 +43,7 @@ pub trait TrapContextStore {
     fn get_syscall_param(&self) -> syscall::SyscallParam;
     fn set_syscall_return_code(&mut self, code: usize);
     fn set_page_table_root_ppn(&mut self, root_user: u64, root_kernel: u64);
+    fn set_trap_entry(&mut self, trap_entry: u64);
 }
 
 pub struct TrapContext {
@@ -50,6 +51,9 @@ pub struct TrapContext {
 }
 
 impl TrapContextStore for TrapContext {
+    fn set_trap_entry(&mut self, trap_entry: u64) {
+        self.store.set_trap_entry(trap_entry);
+    }
     fn set_page_table_root_ppn(&mut self, root_user: u64, root_kernel: u64) {
         self.store.set_page_table_root_ppn(root_user, root_kernel)
     }
@@ -89,7 +93,8 @@ fn build_next_trap_context() -> &'static TrapContext {
     }
 }
 
-pub fn dispatch_trap(ctx: &'static mut TrapContext) -> &'static TrapContext {
+#[no_mangle]
+pub fn trap_entry(ctx: &'static mut TrapContext) -> &'static TrapContext {
     let cause = TrapCause::get_current_cause();
     let set_current_task_state = |state: task::TaskState| {
         task_manager::TASK_MANAGER.lock().set_current_state(state);
