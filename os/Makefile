@@ -22,6 +22,13 @@ disasm:
 	@riscv64-unknown-elf-objdump -sS $(KERNEL_ELF)
 debug1:
 	@echo start running qemu
-	@qemu-system-riscv64  -machine virt -nographic -bios $(BIOS_BIN) -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_MAIN_PHY_ADDR) -s -S
+	@qemu-system-riscv64  -machine virt -nographic -bios $(BIOS_BIN) \
+	-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_MAIN_PHY_ADDR) \
+	-device loader,addr=0x80400000,data=0x4,data-len=4 \
+	-device loader,file=../app/$(TARGET_DIR)/$(TARGET)/release/hello_world,addr=0x80500000,force-raw=true \
+	-device loader,file=../app/$(TARGET_DIR)/$(TARGET)/release/fibonacci,addr=0x80600000,force-raw=true \
+	-device loader,file=../app/$(TARGET_DIR)/$(TARGET)/release/prime_number,addr=0x80700000,force-raw=true \
+	-device loader,file=../app/$(TARGET_DIR)/$(TARGET)/release/zigzag,addr=0x80800000,force-raw=true \
+	-s -S
 debug2:
 	@riscv64-unknown-elf-gdb -ex 'target remote localhost:1234' -ex 'break *$(KERNEL_MAIN_PHY_ADDR)' -ex 'x /16i $(KERNEL_MAIN_PHY_ADDR)' -ex 'c'

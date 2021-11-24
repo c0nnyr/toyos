@@ -3,7 +3,8 @@ use core::mem::size_of;
 use crate::{
     arch::trap::{self, TrapContextStore},
     mm::{
-        self, addr,
+        self,
+        addr::{self, PAGE_SIZE},
         page_table::{self, PageTableTree},
         ppn_manager::{self, PPNManager},
         raw_page,
@@ -37,13 +38,13 @@ impl From<ppn_manager::PhysicalPageNumberGuard> for KernelStackPage {
 
 impl KernelStackPage {
     //KernelStackPage高地址存放trapcontext
-    pub fn get_trap_context(&self) -> &trap::TrapContext {
+    pub fn get_trap_context(&self) -> &'static trap::TrapContext {
         unsafe {
             (self
                 .raw
                 .as_ptr()
-                .add(self.raw.len() - size_of::<trap::TrapContextStoreImpl>())
-                as *const trap::TrapContextStoreImpl)
+                .add(self.raw.len() - size_of::<trap::TrapContext>())
+                as *const trap::TrapContext)
                 .as_ref()
                 .unwrap()
         }
@@ -68,7 +69,7 @@ pub struct KernelStack {
 
 impl KernelStack {
     pub fn init() -> Result<Self, &'static str> {
-        let ppn_manager_inner = ppn_manager::PPN_MANAGER.lock();
+        let ppn_manager_inner = &mut ppn_manager::PPN_MANAGER.lock();
         Ok(Self {
             kernel_stack: [
                 ppn_manager_inner.alloc()?.into(),
@@ -77,11 +78,11 @@ impl KernelStack {
         })
     }
 
-    pub fn get_trap_context(&self) -> &trap::TrapContext {
+    pub fn get_trap_context(&self) -> &'static trap::TrapContext {
         self.kernel_stack[0].get_trap_context()
     }
 
-    pub fn get_trap_context_mut(&mut self) -> &mut trap::TrapContext {
+    pub fn get_trap_context_mut(&mut self) -> &'static mut trap::TrapContext {
         self.kernel_stack[0].get_trap_context_mut()
     }
 }
@@ -139,12 +140,8 @@ impl Task {
         }
     }
 
-    pub fn get_trap_context(&self) -> &trap::TrapContext {
+    pub fn get_trap_context(&self) -> &'static trap::TrapContext {
         self.kernel_stack.get_trap_context()
-    }
-
-    pub fn save_trap_context(&mut self, ctx: &trap::TrapContext) {
-        *self.kernel_stack.get_trap_context_mut() = *ctx
     }
 
     pub fn set_state(&mut self, state: TaskState) {
@@ -237,27 +234,29 @@ impl Task {
         extern "C" {
             fn kernel_text_trap_start_asm();
             fn kernel_text_trap_end_asm();
-            fn kernel_bss_trap_start_asm();
-            fn kernel_bss_trap_end_asm();
         }
         //映射trap
-        let section_def = [
-            (
-                kernel_bss_trap_start_asm as usize,
-                kernel_bss_trap_end_asm as usize,
-                section::MapTarget::Identity,
-                section::BSS_PERMISSION.for_kernel(),
-            ),
-            (
-                kernel_text_trap_start_asm as usize,
-                kernel_text_trap_end_asm as usize,
-                section::MapTarget::Identity,
-                section::TEXT_PERMISSION.for_kernel(),
-            ),
-        ];
+        let section_def = [(
+            kernel_text_trap_start_asm as usize,
+            kernel_text_trap_end_asm as usize,
+            section::MapTarget::Identity,
+            section::TEXT_PERMISSION.for_kernel(),
+        )];
 
         for item in section_def {
             let section = section::VirtualSection::new(item.0, item.1, item.2, item.3);
+            for (vpn, entry, _) in section.iter() {
+                self.page_table_tree.map(vpn, entry);
+            }
+        }
+
+        for kernel_stack in self.kernel_stack.kernel_stack.iter() {
+            let section = section::VirtualSection::new(
+                kernel_stack.ppn.as_addr(),
+                kernel_stack.ppn.as_addr() + PAGE_SIZE,
+                section::MapTarget::Identity,
+                section::DATA_PERMISSION.for_kernel(),
+            );
             for (vpn, entry, _) in section.iter() {
                 self.page_table_tree.map(vpn, entry);
             }
@@ -266,7 +265,7 @@ impl Task {
             .get_trap_context_mut()
             .set_page_table_root_ppn(
                 self.get_page_table_root_ppn().bits as u64,
-                mm::KERNEL_PAGE_TABLE_TREE.lock().get_root_ppn().bits,
+                mm::KERNEL_PAGE_TABLE_TREE.lock().get_root_ppn().bits as u64,
             );
         Ok(())
     }

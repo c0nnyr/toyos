@@ -83,16 +83,9 @@ impl TaskManager {
         self.current_idx
     }
 
-    pub fn get_current_trap_context(&self) -> &trap::TrapContext {
+    pub fn get_current_trap_context(&self) -> &'static trap::TrapContext {
         match &self.tasks[self.current_idx] {
             Some(task) => task.get_trap_context(),
-            None => panic!("never here"),
-        }
-    }
-
-    pub fn save_current_trap_context(&mut self, ctx: &trap::TrapContext) {
-        match &mut self.tasks[self.current_idx] {
-            Some(task) => task.save_trap_context(ctx),
             None => panic!("never here"),
         }
     }

@@ -35,7 +35,7 @@ impl TrapCause {
     }
 }
 
-pub trait TrapContextStore: Default {
+pub trait TrapContextStore {
     fn set_sp(&mut self, sp: u64);
     fn set_pc(&mut self, pc: u64);
     fn mv_pc_to_next(&mut self);
@@ -46,7 +46,7 @@ pub trait TrapContextStore: Default {
 }
 
 pub struct TrapContext {
-    store: &'static mut trap::TrapContextStoreImpl,
+    store: trap::TrapContextStoreImpl,
 }
 
 impl TrapContextStore for TrapContext {
@@ -73,15 +73,6 @@ impl TrapContextStore for TrapContext {
     }
 }
 
-impl TrapContext {
-    pub fn new(store: &'static mut trap::TrapContextStoreImpl) -> Self {
-        TrapContext { store: store }
-    }
-    pub fn raw(&self) -> &'static trap::TrapContextStoreImpl {
-        &self.store
-    }
-}
-
 pub fn init() {
     trap::init();
 }
@@ -90,7 +81,7 @@ fn build_next_trap_context() -> &'static TrapContext {
     let mut task_manager = task_manager::TASK_MANAGER.lock();
     let current_idx = task_manager.get_current_idx();
     match task_manager.switch_to_next_task(current_idx + 1) {
-        Ok(_) => task_manager.get_current_trap_context().raw(),
+        Ok(_) => task_manager.get_current_trap_context(),
         Err(_) => {
             kinfo!("Legacy shutdown now!"); //没有更多应用了
             ecall::shutdown();
@@ -98,15 +89,10 @@ fn build_next_trap_context() -> &'static TrapContext {
     }
 }
 
-pub fn dispatch_trap(ctx: &mut TrapContext) -> &'static TrapContextStoreImpl {
+pub fn dispatch_trap(ctx: &'static mut TrapContext) -> &'static TrapContext {
     let cause = TrapCause::get_current_cause();
     let set_current_task_state = |state: task::TaskState| {
         task_manager::TASK_MANAGER.lock().set_current_state(state);
-    };
-    let save_current_trap_context = |ctx: &TrapContext| {
-        task_manager::TASK_MANAGER
-            .lock()
-            .save_current_trap_context(ctx);
     };
     match cause {
         TrapCause::Exeption(v) => match v {
@@ -124,9 +110,7 @@ pub fn dispatch_trap(ctx: &mut TrapContext) -> &'static TrapContextStoreImpl {
                         build_next_trap_context()
                     }
                     syscall::SyscallId::Reschedule => {
-                        let mut ctx = *ctx;
                         ctx.mv_pc_to_next();
-                        save_current_trap_context(&ctx);
                         build_next_trap_context()
                     }
                     _ => {
@@ -147,7 +131,6 @@ pub fn dispatch_trap(ctx: &mut TrapContext) -> &'static TrapContextStoreImpl {
             Interrupt::Timer => {
                 kinfo!("Timer at {:?}", super::time::get_now());
                 super::time::set_next_timer(core::time::Duration::from_millis(500));
-                save_current_trap_context(ctx);
                 build_next_trap_context()
             }
             Interrupt::Unsupported(v) => {

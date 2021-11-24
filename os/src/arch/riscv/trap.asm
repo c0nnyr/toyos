@@ -15,12 +15,12 @@ enter_trap_asm:
     sfence.vma
 
     mv x2, x31# sp=x2
-    # fn (&TrapContextStore)&TrapContextStore
+    # fn (&TrapContext)&TrapContext
     mv x10, x31 # 设置参数用于消费上下文
     call trap_entry 
     call restore_trap_asm 
 restore_trap_asm:
-    # fn (ptr *TrapContextStore)
+    # fn (ptr *TrapContext)&TrapContext
     # a0=x10=ptr
     mv x31, x10 # t6=x31
     csrw sscratch, x31 #此后sscratch保存内核态的栈顶

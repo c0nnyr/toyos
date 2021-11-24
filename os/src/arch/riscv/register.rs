@@ -108,6 +108,6 @@ impl SAtp {
 
     pub fn from_ppn(ppn: usize) -> Self {
         let mode = 8 << 60; //60~63位为mode，8表示使用Sv39模式，虚拟地址只使用低39位，高25位必须为0
-        Self{bits:mode | ppn}
+        Self { bits: mode | ppn }
     }
 }

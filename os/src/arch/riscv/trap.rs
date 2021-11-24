@@ -1,12 +1,10 @@
 use crate::arch::riscv::register;
 use crate::arch::syscall;
 use crate::arch::trap;
-use crate::arch::trap::TrapContextStore;
-use crate::task::task_manager::TASK_MANAGER;
 global_asm!(include_str!("trap.asm"));
 
 #[repr(C)]
-#[derive(Copy, Clone)] //这样就能正常拷贝了。Copy+Clone说明使用=的时候，不是使用move语义转移所有权，而是拷贝一份
+#[derive(Copy, Clone, Debug)] //这样就能正常拷贝了。Copy+Clone说明使用=的时候，不是使用move语义转移所有权，而是拷贝一份
 pub struct TrapContextStoreImpl {
     //需要保存32寄存器，以及sepc
     //x0..=x32, sepc，用户态satp, 内核态satp 一共34个
@@ -73,6 +71,6 @@ pub fn init() {
 }
 
 #[no_mangle]
-fn trap_entry(ctx: &'static mut TrapContextStoreImpl) -> &'static TrapContextStoreImpl {
-    trap::dispatch_trap(&mut trap::TrapContext::new(ctx))
+fn trap_entry(ctx: &'static mut trap::TrapContext) -> &'static trap::TrapContext {
+    trap::dispatch_trap(ctx)
 }
