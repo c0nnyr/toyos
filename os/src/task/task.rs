@@ -1,7 +1,8 @@
 use core::mem::{self, size_of};
 
 use crate::{
-    arch::trap::{self, TrapContextStore},
+    arch::switch,
+    arch::trap::{self, TrapContext, TrapContextStore},
     mm::{
         self,
         addr::{self, PAGE_SIZE},
@@ -71,6 +72,7 @@ impl KernelStack {
     pub fn get_trap_context(&self) -> &'static trap::TrapContext {
         unsafe {
             ((self.kernel_stack.last().unwrap().vpn.unwrap().as_addr() + PAGE_SIZE
+                - size_of::<switch::TaskContext>()
                 - size_of::<trap::TrapContext>()) as *const trap::TrapContext)
                 .as_ref()
                 .unwrap()
@@ -80,7 +82,25 @@ impl KernelStack {
     pub fn get_trap_context_mut(&mut self) -> &'static mut trap::TrapContext {
         unsafe {
             ((self.kernel_stack.last().unwrap().vpn.unwrap().as_addr() + PAGE_SIZE
+                - size_of::<switch::TaskContext>()
                 - size_of::<trap::TrapContext>()) as *mut trap::TrapContext)
+                .as_mut()
+                .unwrap()
+        }
+    }
+    pub fn get_task_context(&self) -> &'static switch::TaskContext {
+        unsafe {
+            ((self.kernel_stack.last().unwrap().vpn.unwrap().as_addr() + PAGE_SIZE
+                - size_of::<switch::TaskContext>()) as *const switch::TaskContext)
+                .as_ref()
+                .unwrap()
+        }
+    }
+
+    pub fn get_task_context_mut(&mut self) -> &'static mut switch::TaskContext {
+        unsafe {
+            ((self.kernel_stack.last().unwrap().vpn.unwrap().as_addr() + PAGE_SIZE
+                - size_of::<switch::TaskContext>()) as *mut switch::TaskContext)
                 .as_mut()
                 .unwrap()
         }
@@ -105,7 +125,6 @@ impl KernelStack {
 }
 
 pub struct Task {
-    idx: usize,
     pub start_addr: usize,
     end_addr: usize,
     state: TaskState,
@@ -115,7 +134,12 @@ pub struct Task {
         raw_page::RawPage,
     )>; 100], //暂时先用20个来撑一下
     page_table_tree: page_table::PageTableTree,
-    kernel_stack: KernelStack,
+    pub kernel_stack: KernelStack,
+}
+
+fn task_first_entry(ctx: &'static TrapContext) {
+    kinfo!("in task_first_entry");
+    ctx.restore_trap()
 }
 
 impl Task {
@@ -128,7 +152,6 @@ impl Task {
         // }
 
         let mut task = Task {
-            idx,
             start_addr,
             end_addr,
             // trap_context: trap::TrapContext::default(),
@@ -147,7 +170,7 @@ impl Task {
             kernel_stack,
         };
         task.kernel_stack.bind_vpn(addr::VirtualPageNumber::ceil(
-            task.get_kernel_stack_top_virtual_addr(),
+            Task::get_kernel_stack_top_virtual_addr(idx, task.kernel_stack.kernel_stack.len()),
         ));
         task.kernel_stack.map_in_kernel().unwrap();
         task.kernel_stack
@@ -160,8 +183,18 @@ impl Task {
                 task.get_page_table_root_ppn().bits as u64,
                 mm::KERNEL_PAGE_TABLE_TREE.lock().get_root_ppn().bits as u64,
             );
+        let task_ctx = task.kernel_stack.get_task_context_mut();
+        task_ctx.set_idx(idx);
+        task_ctx.set_ra(task_first_entry as usize);
+        task_ctx.set_sp(Task::get_kernel_stack_top_virtual_addr(
+            idx,
+            task.kernel_stack.kernel_stack.len(),
+        ));
+        task_ctx.set_param0(task.kernel_stack.get_trap_context() as *const TrapContext as usize);
         task
     }
+
+    // pub
 
     pub fn get_code(&self) -> &[u8] {
         unsafe {
@@ -259,10 +292,11 @@ impl Task {
         Ok(())
     }
 
-    pub fn get_kernel_stack_top_virtual_addr(&self) -> usize {
+    pub fn get_kernel_stack_top_virtual_addr(idx: usize, kernel_pages: usize) -> usize {
         return addr::TOPEST_ADDR + 1
-            - self.idx * self.kernel_stack.kernel_stack.len() * PAGE_SIZE
+            - idx * kernel_pages * PAGE_SIZE
             - PAGE_SIZE
+            - mem::size_of::<switch::TaskContext>()
             - mem::size_of::<trap::TrapContext>();
     }
 
@@ -307,22 +341,6 @@ impl Task {
                 self.page_table_tree.map(vpn, entry);
             }
         }
-        kinfo!(
-            "map 0x{:x} to 0x{:x}",
-            addr::TOPEST_ADDR - PAGE_SIZE + 1,
-            mm::KERNEL_PAGE_TABLE_TREE
-                .lock()
-                .translate(addr::TOPEST_ADDR - PAGE_SIZE + 1)
-                .unwrap()
-        );
-        kinfo!(
-            "map 0x{:x} to 0x{:x}",
-            addr::TOPEST_ADDR - PAGE_SIZE + 1 - mem::size_of::<trap::TrapContext>(),
-            mm::KERNEL_PAGE_TABLE_TREE
-                .lock()
-                .translate(addr::TOPEST_ADDR - PAGE_SIZE + 1 - mem::size_of::<trap::TrapContext>())
-                .unwrap()
-        );
         Ok(())
     }
 

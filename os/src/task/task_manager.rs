@@ -55,6 +55,21 @@ impl TaskManager {
         }
     }
 
+    pub fn get_task_mut(&mut self, idx: usize) -> Option<&mut task::Task> {
+        if idx < MAX_TASK_NUM {
+            (&mut self.tasks[idx]).as_mut()
+        } else {
+            None
+        }
+    }
+    pub fn get_task(&self, idx: usize) -> Option<&task::Task> {
+        if idx < MAX_TASK_NUM {
+            (&self.tasks[idx]).as_ref()
+        } else {
+            None
+        }
+    }
+
     pub fn switch_to_task(&mut self, idx: usize) -> Result<(), &'static str> {
         //这个“？”是Rust的语法糖，如果是Err就直接原样Return了。适用于透传Err的那些场景。
         //相当于match self.load_task_code(idx){Err(err)=>{return err;},Ok(v)=>{xx}}
@@ -65,6 +80,25 @@ impl TaskManager {
         Ok(())
     }
 
+    pub fn schedule(&self, from_idx: usize) -> Result<(), &'static str> {
+        for i in 0..MAX_TASK_NUM {
+            let idx = (i + from_idx) % MAX_TASK_NUM; //循环一圈
+            match &self.tasks[idx] {
+                Some(task) => {
+                    if task.is_runnable() {
+                        let cur_task = self.get_task(from_idx).unwrap();
+                        cur_task
+                            .kernel_stack
+                            .get_task_context()
+                            .switch_to(task.kernel_stack.get_task_context());
+                        return Ok(());
+                    }
+                }
+                None => (),
+            }
+        }
+        Err("no more task")
+    }
     pub fn switch_to_next_task(&mut self, from_idx: usize) -> Result<(), &'static str> {
         for i in 0..MAX_TASK_NUM {
             let idx = (i + from_idx) % MAX_TASK_NUM; //循环一圈
@@ -72,6 +106,21 @@ impl TaskManager {
                 Some(task) => {
                     if task.is_runnable() {
                         return self.switch_to_task(idx);
+                    }
+                }
+                None => (),
+            }
+        }
+        Err("no more task")
+    }
+
+    pub fn get_next_task(&mut self, from_idx: usize) -> Result<usize, &'static str> {
+        for i in 0..MAX_TASK_NUM {
+            let idx = (i + 1 + from_idx) % MAX_TASK_NUM; //循环一圈
+            match &self.tasks[idx] {
+                Some(task) => {
+                    if task.is_runnable() {
+                        return Ok(idx);
                     }
                 }
                 None => (),
