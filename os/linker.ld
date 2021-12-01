@@ -6,6 +6,11 @@ SECTIONS
     kernel_text_start_asm = .;
     .text : {  # 都归在.text段
         *(.text._start) #_start需要在最前面，这样就能正确从_start启动了
+        . = ALIGN(4K); 
+        kernel_text_trap_start_asm = .;
+        *(.text.trap) 
+        kernel_text_trap_end_asm = .;
+        . = ALIGN(4K); 
         *(.text .text.*) # 表示所有.text和.text.*这些段，0个或者多个。 下面那些同理
     }
     kernel_text_end_asm = .;
@@ -30,6 +35,11 @@ SECTIONS
     . = kernel_bss_start_asm;
     .bss : {
         *(.bss.boot_stack) # 将栈放在最前面
+        . = ALIGN(4K); 
+        kernel_bss_trap_start_asm = .;
+        *(.bss.trap) 
+        kernel_bss_trap_end_asm = .;
+        . = ALIGN(4K); 
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     }

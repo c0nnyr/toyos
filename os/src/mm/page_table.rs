@@ -217,4 +217,8 @@ impl PageTableTree {
     pub fn active(&self) {
         arch::page_table::active_page_table_root(self.page_tables[0].as_ref().unwrap().ppn.ppn);
     }
+
+    pub fn get_root_ppn(&self) -> addr::PhysicalPageNumber {
+        self.page_tables[0].as_ref().unwrap().ppn.ppn
+    }
 }
