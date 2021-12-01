@@ -1,4 +1,4 @@
-    .section .text
+    .section .text.trap
     .balign 8
 enter_trap_asm:
     csrrw x31, sscratch, x31 # 暂时交换保存一下x31
@@ -10,6 +10,10 @@ enter_trap_asm:
     # 保存sepc
     csrr x30, sepc 
     sd x30, 32*8(x31) 
+
+    ld x30, 33*8(x31)  # 读取内核satp
+    csrw satp, x30
+    sfence.vma
 
     la x2, boot_kernal_stack_end_asm# sp=x2，直接用boot的栈作为这里的内核栈，因为到这里，boot的栈已经不会再用了。
     # fn (&TrapContextStore)
@@ -23,6 +27,11 @@ restore_trap_asm:
     mv x31, x10 # t6=x31
     ld x30, 32*8(x31) #t5=x30
     csrw sepc, x30
+
+    ld x30, 34*8(x31)  # 读取内核satp
+    csrw satp, x30
+    sfence.vma
+
     ld x1, 1*8(x31); ld x2, 2*8(x31); ld x3, 3*8(x31); ld x4, 4*8(x31); ld x5, 5*8(x31); ld x6, 6*8(x31); ld x7, 7*8(x31); ld x8, 8*8(x31); ld x9, 9*8(x31); ld x10, 10*8(x31); ld x11, 11*8(x31); ld x12, 12*8(x31); ld x13, 13*8(x31); ld x14, 14*8(x31); ld x15, 15*8(x31); ld x16, 16*8(x31); ld x17, 17*8(x31); ld x18, 18*8(x31); ld x19, 19*8(x31); ld x20, 20*8(x31); ld x21, 21*8(x31); ld x22, 22*8(x31); ld x23, 23*8(x31); ld x24, 24*8(x31); ld x25, 25*8(x31); ld x26, 26*8(x31); ld x27, 27*8(x31); ld x28, 28*8(x31); ld x29, 29*8(x31); ld x30, 30*8(x31); ld x31, 31*8(x31);
     sret
 init_trap_entry_asm:
@@ -30,9 +39,9 @@ init_trap_entry_asm:
     csrw stvec, t0
     ret
 
-    .section .bss
+    .section .bss.trap
     .balign 8
 trap_context_asm: # 保存TrapContextStore的全局变量
-    .space 8*33 #注意size要和TrapContextStore一致
+    .space 8*35 #注意size要和TrapContextStore一致
 trap_context_end_asm: # 方便在编译时候做一下校验
     
