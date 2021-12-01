@@ -19,7 +19,7 @@ fn main() {
     build_first_task_trap_context().restore_trap();
 }
 // 这里必须依靠一个函数，及时释放task_manager获得的锁。
-fn build_first_task_trap_context() -> trap::TrapContext {
+fn build_first_task_trap_context() -> &'static trap::TrapContext {
     let mut task_manager = task::task_manager::TASK_MANAGER.lock();
     task_manager.switch_to_task(0).unwrap(); //至少得有一个应用
     task_manager.get_current_trap_context()

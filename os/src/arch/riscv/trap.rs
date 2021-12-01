@@ -6,11 +6,10 @@ use crate::mm::KERNEL_PAGE_TABLE_TREE;
 global_asm!(include_str!("trap.asm"));
 
 #[repr(C)]
-#[derive(Copy, Clone)] //这样就能正常拷贝了。Copy+Clone说明使用=的时候，不是使用move语义转移所有权，而是拷贝一份
 pub struct TrapContextStoreImpl {
     //需要保存32寄存器，以及sepc
-    //x0..=x32, sepc，satp内核态, satp用户态, 内核栈
-    ctx: [u64; 36], //使用数组，方便直接汇编的时候操作，免得有对齐的问题
+    //x0..=x32, sepc，satp内核态, satp用户态
+    ctx: [u64; 35], //使用数组，方便直接汇编的时候操作，免得有对齐的问题
 }
 
 impl trap::TrapContextStore for TrapContextStoreImpl {
@@ -21,10 +20,6 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
         } else {
             self.ctx[33] = satp.bits as u64;
         }
-    }
-
-    fn set_kernel_stack(&mut self, sp: u64) {
-        self.ctx[35] = sp; //x2就是sp
     }
 
     fn set_sp(&mut self, sp: u64) {
@@ -43,13 +38,8 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
         //根据自己保存的上下文恢复到用户态
         extern "C" {
             fn restore_trap_asm(ctx: &TrapContextStoreImpl) -> !;
-            fn trap_context_asm();
         }
-        unsafe {
-            let ctx = (trap_context_asm as usize as *mut Self).as_mut().unwrap();
-            *ctx = *self;
-            restore_trap_asm(ctx)
-        }
+        unsafe { restore_trap_asm(self) }
     }
 
     fn get_syscall_param(&self) -> syscall::SyscallParam {
@@ -70,24 +60,13 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
 }
 impl Default for TrapContextStoreImpl {
     fn default() -> Self {
-        let mut ctx = TrapContextStoreImpl { ctx: [0; 36] };
-        let root_ppn = KERNEL_PAGE_TABLE_TREE.lock().get_root_ppn();
-        ctx.set_page_table_root_ppn(root_ppn.bits as u64, false);
-        ctx
+        TrapContextStoreImpl { ctx: [0; 35] }
     }
 }
 
 pub fn init() {
     extern "C" {
         fn init_trap_entry_asm();
-        fn trap_context_asm();
-        fn trap_context_end_asm();
-    }
-    //校验一下TrapContextStore的大小
-    if core::mem::size_of::<TrapContextStoreImpl>()
-        != (trap_context_end_asm as usize - trap_context_asm as usize)
-    {
-        panic!("TrapContextStore size not equal");
     }
     unsafe {
         init_trap_entry_asm();
@@ -95,6 +74,6 @@ pub fn init() {
 }
 
 #[no_mangle]
-fn trap_entry(ctx: &mut TrapContextStoreImpl) {
-    *ctx = *trap::dispatch_trap(&mut trap::TrapContext::new(ctx)).raw();
+fn trap_entry(ctx: &'static mut trap::TrapContext) -> &'static trap::TrapContext {
+    trap::dispatch_trap(ctx)
 }

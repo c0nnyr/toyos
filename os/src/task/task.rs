@@ -1,3 +1,5 @@
+use core::mem;
+
 use crate::{
     arch::trap::{self, TrapContextStore},
     mm::{
@@ -21,7 +23,6 @@ pub enum TaskState {
 pub struct Task {
     pub start_addr: usize,
     end_addr: usize,
-    trap_context: trap::TrapContext,
     state: TaskState,
     raw_pages: [Option<(
         addr::VirtualPageNumber,
@@ -38,7 +39,6 @@ impl Task {
         let mut task = Task {
             start_addr,
             end_addr,
-            trap_context: trap::TrapContext::default(),
             state: TaskState::Init,
             raw_pages: [
                 None, None, None, None, None, None, None, None, None, None, None, None, None, None,
@@ -54,10 +54,13 @@ impl Task {
             kernel_stack,
         };
         task.page_table_tree.init().unwrap();
-        task.trap_context
-            .set_kernel_stack((task.kernel_stack.ppn.as_addr() + PAGE_SIZE) as u64);
-        task.trap_context
-            .set_page_table_root_ppn(task.page_table_tree.get_root_ppn().bits as u64, true);
+        let trap_context = task.kernel_stack.get_trap_context_mut();
+        *trap_context = trap::TrapContext::default();
+        trap_context.set_page_table_root_ppn(task.page_table_tree.get_root_ppn().bits as u64, true);
+        trap_context.set_page_table_root_ppn(
+            mm::KERNEL_PAGE_TABLE_TREE.lock().get_root_ppn().bits as u64,
+            false,
+        );
         task
     }
 
@@ -72,12 +75,8 @@ impl Task {
         }
     }
 
-    pub fn get_trap_context(&self) -> trap::TrapContext {
-        self.trap_context
-    }
-
-    pub fn save_trap_context(&mut self, ctx: &trap::TrapContext) {
-        self.trap_context = *ctx;
+    pub fn get_trap_context(&self) -> &'static trap::TrapContext {
+        self.kernel_stack.get_trap_context()
     }
 
     pub fn set_state(&mut self, state: TaskState) {
@@ -152,8 +151,10 @@ impl Task {
             }
             let entry_addr = elf_header.pt2.entry_point();
 
-            self.trap_context.set_pc(entry_addr);
-            self.trap_context.set_sp(section.end_vpn.as_addr() as u64);
+            self.kernel_stack.get_trap_context_mut().set_pc(entry_addr);
+            self.kernel_stack
+                .get_trap_context_mut()
+                .set_sp(section.end_vpn.as_addr() as u64);
         }
         Ok(())
     }
@@ -167,22 +168,20 @@ impl Task {
         extern "C" {
             fn kernel_text_trap_start_asm();
             fn kernel_text_trap_end_asm();
-            fn kernel_bss_trap_start_asm();
-            fn kernel_bss_trap_end_asm();
         }
         //映射trap
         let section_def = [
-            (
-                kernel_bss_trap_start_asm as usize,
-                kernel_bss_trap_end_asm as usize,
-                section::MapTarget::Identity,
-                section::BSS_PERMISSION.for_kernel(),
-            ),
             (
                 kernel_text_trap_start_asm as usize,
                 kernel_text_trap_end_asm as usize,
                 section::MapTarget::Identity,
                 section::TEXT_PERMISSION.for_kernel(),
+            ),
+            (
+                self.kernel_stack.ppn.as_addr(),
+                self.kernel_stack.ppn.as_addr() + PAGE_SIZE,
+                section::MapTarget::Identity,
+                section::BSS_PERMISSION.for_kernel(),
             ),
         ];
 

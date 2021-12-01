@@ -35,11 +35,6 @@ SECTIONS
     . = kernel_bss_start_asm;
     .bss : {
         *(.bss.boot_stack) # 将栈放在最前面
-        . = ALIGN(4K); 
-        kernel_bss_trap_start_asm = .;
-        *(.bss.trap) 
-        kernel_bss_trap_end_asm = .;
-        . = ALIGN(4K); 
         *(.bss .bss.*)
         *(.sbss .sbss.*)
     }

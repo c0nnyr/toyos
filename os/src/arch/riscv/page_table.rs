@@ -65,6 +65,6 @@ pub fn split_vpn(addr: usize) -> [usize; 3] {
     offsets
 }
 
-pub fn active_page_table_root(ppn:addr::PhysicalPageNumber){
+pub fn active_page_table_root(ppn: addr::PhysicalPageNumber) {
     SAtp::from_ppn(ppn.bits).set()
 }

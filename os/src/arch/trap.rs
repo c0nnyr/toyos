@@ -42,10 +42,8 @@ pub trait TrapContextStore: Default {
     fn get_syscall_param(&self) -> syscall::SyscallParam;
     fn set_syscall_return_code(&mut self, code: usize);
     fn set_page_table_root_ppn(&mut self, root: u64, is_user: bool);
-    fn set_kernel_stack(&mut self, sp: u64);
 }
 
-#[derive(Clone, Copy)]
 pub struct TrapContext {
     store: trap::TrapContextStoreImpl,
 }
@@ -53,9 +51,6 @@ pub struct TrapContext {
 impl TrapContextStore for TrapContext {
     fn set_page_table_root_ppn(&mut self, root: u64, is_user: bool) {
         self.store.set_page_table_root_ppn(root, is_user)
-    }
-    fn set_kernel_stack(&mut self, sp: u64) {
-        self.store.set_kernel_stack(sp)
     }
     fn set_sp(&mut self, sp: u64) {
         self.store.set_sp(sp)
@@ -85,20 +80,11 @@ impl Default for TrapContext {
     }
 }
 
-impl TrapContext {
-    pub fn new(store: &trap::TrapContextStoreImpl) -> Self {
-        TrapContext { store: *store }
-    }
-    pub fn raw(&self) -> &trap::TrapContextStoreImpl {
-        &self.store
-    }
-}
-
 pub fn init() {
     trap::init();
 }
 
-fn build_next_trap_context() -> TrapContext {
+fn build_next_trap_context() -> &'static TrapContext {
     let mut task_manager = task_manager::TASK_MANAGER.lock();
     let current_idx = task_manager.get_current_idx();
     match task_manager.switch_to_next_task(current_idx + 1) {
@@ -110,15 +96,10 @@ fn build_next_trap_context() -> TrapContext {
     }
 }
 
-pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
+pub fn dispatch_trap(ctx: &'static mut TrapContext) -> &'static TrapContext {
     let cause = TrapCause::get_current_cause();
     let set_current_task_state = |state: task::TaskState| {
         task_manager::TASK_MANAGER.lock().set_current_state(state);
-    };
-    let save_current_trap_context = |ctx: &TrapContext| {
-        task_manager::TASK_MANAGER
-            .lock()
-            .save_current_trap_context(ctx);
     };
     match cause {
         TrapCause::Exeption(v) => match v {
@@ -136,14 +117,11 @@ pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
                         build_next_trap_context()
                     }
                     syscall::SyscallId::Reschedule => {
-                        let mut ctx = *ctx;
                         ctx.mv_pc_to_next();
-                        save_current_trap_context(&ctx);
                         build_next_trap_context()
                     }
                     _ => {
                         let return_code = syscall_param.dispatch_syscall();
-                        let mut ctx = *ctx; //拷贝一份，注意这里需要给TrapContext增加Copy/Clone
                         ctx.set_syscall_return_code(return_code);
                         ctx.mv_pc_to_next();
                         ctx
@@ -160,7 +138,6 @@ pub fn dispatch_trap(ctx: &TrapContext) -> TrapContext {
             Interrupt::Timer => {
                 kinfo!("Timer at {:?}", super::time::get_now());
                 super::time::set_next_timer(core::time::Duration::from_millis(500));
-                save_current_trap_context(ctx);
                 build_next_trap_context()
             }
             Interrupt::Unsupported(v) => {
