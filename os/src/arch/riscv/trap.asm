@@ -15,7 +15,7 @@ enter_trap_asm:
     csrw satp, x30
     sfence.vma
 
-    la x2, boot_kernal_stack_end_asm# sp=x2，直接用boot的栈作为这里的内核栈，因为到这里，boot的栈已经不会再用了。
+    ld x2, 35*8(x31) # sp=x2，读取内核栈
     # fn (&TrapContextStore)
     la x10, trap_context_asm # 设置参数用于消费上下文
     call trap_entry 
@@ -28,7 +28,7 @@ restore_trap_asm:
     ld x30, 32*8(x31) #t5=x30
     csrw sepc, x30
 
-    ld x30, 34*8(x31)  # 读取内核satp
+    ld x30, 34*8(x31)  # 读取用户态satp
     csrw satp, x30
     sfence.vma
 
@@ -42,6 +42,6 @@ init_trap_entry_asm:
     .section .bss.trap
     .balign 8
 trap_context_asm: # 保存TrapContextStore的全局变量
-    .space 8*35 #注意size要和TrapContextStore一致
+    .space 8*36 #注意size要和TrapContextStore一致
 trap_context_end_asm: # 方便在编译时候做一下校验
     

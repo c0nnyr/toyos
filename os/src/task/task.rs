@@ -1,11 +1,14 @@
 use crate::{
     arch::trap::{self, TrapContextStore},
     mm::{
-        self, addr,
+        self,
+        addr::{self, PAGE_SIZE},
         page_table::{self, PageTableTree},
+        ppn_manager::{PPNManager, PPN_MANAGER},
         raw_page,
         section::{self, DATA_PERMISSION},
     },
+    task::kernel_stack,
 }; //引入TrapContextStore才能使用TrapContext身上对这个trait的实现
 
 #[derive(Clone, Copy, PartialEq)]
@@ -26,10 +29,12 @@ pub struct Task {
         raw_page::RawPage,
     )>; 100], //暂时先用20个来撑一下
     page_table_tree: page_table::PageTableTree,
+    kernel_stack: kernel_stack::KernelStack,
 }
 
 impl Task {
     pub fn new(start_addr: usize, end_addr: usize) -> Self {
+        let kernel_stack: kernel_stack::KernelStack = PPN_MANAGER.lock().alloc().unwrap().into();
         let mut task = Task {
             start_addr,
             end_addr,
@@ -46,8 +51,13 @@ impl Task {
                 None, None,
             ],
             page_table_tree: page_table::PageTableTree::default(),
+            kernel_stack,
         };
         task.page_table_tree.init().unwrap();
+        task.trap_context
+            .set_kernel_stack((task.kernel_stack.ppn.as_addr() + PAGE_SIZE) as u64);
+        task.trap_context
+            .set_page_table_root_ppn(task.page_table_tree.get_root_ppn().bits as u64, true);
         task
     }
 
@@ -182,8 +192,6 @@ impl Task {
                 self.page_table_tree.map(vpn, entry);
             }
         }
-        self.trap_context
-            .set_page_table_root_ppn(self.page_table_tree.get_root_ppn().bits as u64, true);
         Ok(())
     }
 }

@@ -42,6 +42,7 @@ pub trait TrapContextStore: Default {
     fn get_syscall_param(&self) -> syscall::SyscallParam;
     fn set_syscall_return_code(&mut self, code: usize);
     fn set_page_table_root_ppn(&mut self, root: u64, is_user: bool);
+    fn set_kernel_stack(&mut self, sp: u64);
 }
 
 #[derive(Clone, Copy)]
@@ -52,6 +53,9 @@ pub struct TrapContext {
 impl TrapContextStore for TrapContext {
     fn set_page_table_root_ppn(&mut self, root: u64, is_user: bool) {
         self.store.set_page_table_root_ppn(root, is_user)
+    }
+    fn set_kernel_stack(&mut self, sp: u64) {
+        self.store.set_kernel_stack(sp)
     }
     fn set_sp(&mut self, sp: u64) {
         self.store.set_sp(sp)
