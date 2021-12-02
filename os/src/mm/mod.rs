@@ -78,15 +78,6 @@ fn init_kernel_map() {
             section::MapTarget::Identity,
             section::DATA_PERMISSION.for_kernel(),
         ),
-        //映射trap
-        (
-            addr::TRAP_ADDR,
-            addr::TRAP_ADDR + addr::PAGE_SIZE,
-            section::MapTarget::AlignTo(addr::PhysicalPageNumber::floor(
-                kernel_text_trap_start_asm as usize,
-            )),
-            section::TEXT_PERMISSION.for_kernel(),
-        ),
     ];
 
     for item in section_def {

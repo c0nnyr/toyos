@@ -22,6 +22,7 @@ pub enum TaskState {
 
 pub struct Task {
     pub start_addr: usize,
+    idx:usize,
     end_addr: usize,
     state: TaskState,
     raw_pages: [Option<(
@@ -34,9 +35,11 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new(start_addr: usize, end_addr: usize) -> Self {
-        let kernel_stack: kernel_stack::KernelStack = PPN_MANAGER.lock().alloc().unwrap().into();
+    pub fn new(idx: usize, start_addr: usize, end_addr: usize) -> Self {
+        let mut kernel_stack: kernel_stack::KernelStack = PPN_MANAGER.lock().alloc().unwrap().into();
+        kernel_stack.task_idx = Some(idx);
         let mut task = Task {
+            idx,
             start_addr,
             end_addr,
             state: TaskState::Init,
@@ -54,6 +57,7 @@ impl Task {
             kernel_stack,
         };
         task.page_table_tree.init().unwrap();
+        task.map_for_kernel().unwrap(); //映射trap相关的虚拟地址，然后就可以正常使用trap_context相关的虚拟地址了
         let trap_context = task.kernel_stack.get_trap_context_mut();
         *trap_context = trap::TrapContext::default();
         trap_context.set_page_table_root_ppn(task.page_table_tree.get_root_ppn().bits as u64, true);
@@ -156,16 +160,20 @@ impl Task {
             self.kernel_stack
                 .get_trap_context_mut()
                 .set_sp(section.end_vpn.as_addr() as u64);
+            self.map_for_user();
         }
         Ok(())
     }
 
-    pub fn map(&mut self) -> Result<(), &'static str> {
+    pub fn map_for_user(&mut self) -> Result<(), &'static str> {
         for item in self.raw_pages.iter().as_ref() {
             if let Some(item) = item {
                 self.page_table_tree.map(item.0, item.1)?;
             }
         }
+        return Ok(())
+    }
+    pub fn map_for_kernel(&mut self) -> Result<(), &'static str> {
         extern "C" {
             fn kernel_text_trap_start_asm();
             fn kernel_text_trap_end_asm();
@@ -181,9 +189,9 @@ impl Task {
                 section::TEXT_PERMISSION.for_kernel(),
             ),
             (
-                self.kernel_stack.ppn.as_addr(),
-                self.kernel_stack.ppn.as_addr() + PAGE_SIZE,
-                section::MapTarget::Identity,
+                self.kernel_stack.get_bottom(),
+                self.kernel_stack.get_top(),
+                section::MapTarget::AlignTo(self.kernel_stack.ppn.ppn),
                 section::BSS_PERMISSION.for_kernel(),
             ),
         ];
@@ -192,6 +200,7 @@ impl Task {
             let section = section::VirtualSection::new(item.0, item.1, item.2, item.3);
             for (vpn, entry, _) in section.iter() {
                 self.page_table_tree.map(vpn, entry);
+                mm::KERNEL_PAGE_TABLE_TREE.lock().map(vpn, entry);
             }
         }
         Ok(())

@@ -1,18 +1,23 @@
 use core::mem;
 
 use crate::arch::trap;
-use crate::mm::addr;
+use crate::mm::addr::{self, TRAP_ADDR};
 use crate::mm::addr::PAGE_SIZE;
 use crate::mm::ppn_manager;
 
 pub struct KernelStack {
     pub ppn: ppn_manager::PhysicalPageNumberGuard,
+    pub task_idx: Option<usize>,
     raw: &'static mut [u8; addr::PAGE_SIZE],
 }
 
 impl KernelStack {
     pub fn get_top(&self) -> usize {
-        self.ppn.as_addr() + PAGE_SIZE - mem::size_of::<trap::TrapContext>()
+        TRAP_ADDR - 2 * PAGE_SIZE * (self.task_idx.unwrap() + 1) + PAGE_SIZE - mem::size_of::<trap::TrapContext>()
+    }
+
+    pub fn get_bottom(&self) -> usize {
+        TRAP_ADDR - 2 * PAGE_SIZE * (self.task_idx.unwrap() + 1)
     }
     pub fn get_trap_context(&self) -> &'static trap::TrapContext {
         unsafe {
@@ -33,6 +38,6 @@ impl From<ppn_manager::PhysicalPageNumberGuard> for KernelStack {
                 .as_mut()
                 .unwrap()
         };
-        Self { ppn: v, raw }
+        Self { ppn: v, raw , task_idx: None}
     }
 }
