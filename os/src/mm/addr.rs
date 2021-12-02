@@ -1,5 +1,7 @@
 pub const PAGE_SIZE_BIT: usize = 12;
 pub const PAGE_SIZE: usize = 1 << PAGE_SIZE_BIT; // 4K
+pub const ADDR_UPPER_BOUND: usize = 1 << 32; //地址上限
+pub const TRAP_ADDR: usize = ADDR_UPPER_BOUND - PAGE_SIZE;
 
 #[derive(Copy, Clone, Debug)]
 pub struct PhysicalPageNumber {

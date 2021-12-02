@@ -61,6 +61,7 @@ impl Task {
             mm::KERNEL_PAGE_TABLE_TREE.lock().get_root_ppn().bits as u64,
             false,
         );
+        trap_context.set_trap_handler(trap::trap_entry as u64);
         task
     }
 
@@ -172,9 +173,11 @@ impl Task {
         //映射trap
         let section_def = [
             (
-                kernel_text_trap_start_asm as usize,
-                kernel_text_trap_end_asm as usize,
-                section::MapTarget::Identity,
+                addr::TRAP_ADDR,
+                addr::TRAP_ADDR + addr::PAGE_SIZE,
+                section::MapTarget::AlignTo(addr::PhysicalPageNumber::floor(
+                    kernel_text_trap_start_asm as usize,
+                )),
                 section::TEXT_PERMISSION.for_kernel(),
             ),
             (

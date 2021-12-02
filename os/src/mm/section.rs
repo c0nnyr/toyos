@@ -54,6 +54,7 @@ impl Permission {
 pub enum MapTarget<'a> {
     Identity,
     Random(Option<&'a [u8]>),
+    AlignTo(addr::PhysicalPageNumber),
 }
 
 // [start_vpn, end_vpn)
@@ -121,6 +122,12 @@ impl Iterator for VirtualSectionIter<'_> {
                     }
                     (raw_page.ppn.ppn, Some(raw_page))
                 }
+                MapTarget::AlignTo(ppn) => (
+                    addr::PhysicalPageNumber::from(
+                        ppn.bits + ret.bits - self.section.start_vpn.bits,
+                    ),
+                    None,
+                ),
             };
             let entry = page_table::PageTableEntry {
                 ppn: ppn,
