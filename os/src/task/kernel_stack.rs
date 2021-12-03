@@ -17,7 +17,7 @@ impl KernelStack {
     }
 
     pub fn get_bottom(&self) -> usize {
-        TRAP_ADDR - 2 * PAGE_SIZE * (self.task_idx.unwrap() + 1)
+        TRAP_ADDR - 2 * PAGE_SIZE * (self.task_idx.unwrap() + 1) //乘以2是想留着一页作栈之间的分隔，以便防止栈溢出
     }
     pub fn get_trap_context(&self) -> &'static trap::TrapContext {
         unsafe {

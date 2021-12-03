@@ -10,7 +10,7 @@ use crate::{
         raw_page,
         section::{self, DATA_PERMISSION},
     },
-    task::kernel_stack,
+    task::{kernel_stack, task_manager::TASK_MANAGER},
 }; //引入TrapContextStore才能使用TrapContext身上对这个trait的实现
 
 #[derive(Clone, Copy, PartialEq)]
@@ -22,7 +22,7 @@ pub enum TaskState {
 
 pub struct Task {
     pub start_addr: usize,
-    idx:usize,
+    idx: usize,
     end_addr: usize,
     state: TaskState,
     raw_pages: [Option<(
@@ -31,12 +31,25 @@ pub struct Task {
         raw_page::RawPage,
     )>; 100], //暂时先用20个来撑一下
     page_table_tree: page_table::PageTableTree,
-    kernel_stack: kernel_stack::KernelStack,
+    pub kernel_stack: kernel_stack::KernelStack,
+}
+
+fn first_restore_trap() {
+    let ctx = || {
+        let mut mgr = TASK_MANAGER.lock();
+        let cur_idx = mgr.get_current_idx();
+        let task = mgr.get_task_mut(cur_idx).unwrap();
+        task.load_code().unwrap();
+        let ctx = task.kernel_stack.get_trap_context();
+        ctx
+    };
+    ctx().restore_trap()
 }
 
 impl Task {
     pub fn new(idx: usize, start_addr: usize, end_addr: usize) -> Self {
-        let mut kernel_stack: kernel_stack::KernelStack = PPN_MANAGER.lock().alloc().unwrap().into();
+        let mut kernel_stack: kernel_stack::KernelStack =
+            PPN_MANAGER.lock().alloc().unwrap().into();
         kernel_stack.task_idx = Some(idx);
         let mut task = Task {
             idx,
@@ -66,6 +79,9 @@ impl Task {
             false,
         );
         trap_context.set_trap_handler(trap::trap_entry as u64);
+        let task_ctx = trap_context.get_task_context_mut();
+        task_ctx.set_return_addr(first_restore_trap as usize);
+        task_ctx.set_sp(task.kernel_stack.get_top());
         task
     }
 
@@ -171,7 +187,7 @@ impl Task {
                 self.page_table_tree.map(item.0, item.1)?;
             }
         }
-        return Ok(())
+        return Ok(());
     }
     pub fn map_for_kernel(&mut self) -> Result<(), &'static str> {
         extern "C" {

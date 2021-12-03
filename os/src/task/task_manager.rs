@@ -1,4 +1,5 @@
 use super::task;
+use crate::arch::trap::TrapContextStore;
 use crate::arch::{time, trap};
 use crate::mm::{self, addr, page_table};
 
@@ -70,7 +71,14 @@ impl TaskManager {
             match &self.tasks[idx] {
                 Some(task) => {
                     if task.is_runnable() {
-                        return self.switch_to_task(idx);
+                        kinfo!(
+                            "==============================LoadingTask {} at {:?}.",
+                            idx,
+                            time::get_now()
+                        );
+                        self.current_idx = idx;
+                        self.set_current_state(task::TaskState::Running);
+                        return Ok(());
                     }
                 }
                 None => (),
@@ -88,6 +96,17 @@ impl TaskManager {
             Some(task) => task.get_trap_context(),
             None => panic!("never here"),
         }
+    }
+
+    pub fn get_current_trap_context_mut(&mut self) -> &'static mut trap::TrapContext {
+        match &mut self.tasks[self.current_idx] {
+            Some(task) => task.kernel_stack.get_trap_context_mut(),
+            None => panic!("never here"),
+        }
+    }
+
+    pub fn get_task_mut(&mut self, idx: usize) -> Option<&mut task::Task> {
+        (&mut self.tasks[idx]).as_mut()
     }
 
     pub fn set_current_state(&mut self, state: task::TaskState) {

@@ -4,6 +4,9 @@ use crate::arch::trap;
 use crate::arch::trap::TrapContextStore;
 use crate::mm::addr;
 use crate::mm::KERNEL_PAGE_TABLE_TREE;
+
+use super::switch;
+use super::switch::TaskContext;
 global_asm!(include_str!("trap.asm"));
 
 #[repr(C)]
@@ -11,9 +14,14 @@ pub struct TrapContextStoreImpl {
     //需要保存32寄存器，以及sepc
     //x0..=x32, sepc，satp内核态, satp用户态, trap_handler
     ctx: [u64; 36], //使用数组，方便直接汇编的时候操作，免得有对齐的问题
+    task_ctx: TaskContext,
 }
 
 impl trap::TrapContextStore for TrapContextStoreImpl {
+    fn get_task_context_mut(&mut self) -> &mut switch::TaskContext {
+        &mut self.task_ctx
+    }
+
     fn set_page_table_root_ppn(&mut self, root: u64, is_user: bool) {
         let satp = register::SAtp::from_ppn(root as usize);
         if is_user {
@@ -71,7 +79,10 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
 }
 impl Default for TrapContextStoreImpl {
     fn default() -> Self {
-        TrapContextStoreImpl { ctx: [0; 36] }
+        TrapContextStoreImpl {
+            ctx: [0; 36],
+            task_ctx: switch::TaskContext::default(),
+        }
     }
 }
 
