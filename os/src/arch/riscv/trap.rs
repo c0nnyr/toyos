@@ -21,6 +21,9 @@ impl trap::TrapContextStore for TrapContextStoreImpl {
     fn get_task_context_mut(&mut self) -> &mut switch::TaskContext {
         &mut self.task_ctx
     }
+    fn get_task_context(&self) -> &switch::TaskContext {
+        &self.task_ctx
+    }
 
     fn set_page_table_root_ppn(&mut self, root: u64, is_user: bool) {
         let satp = register::SAtp::from_ppn(root as usize);

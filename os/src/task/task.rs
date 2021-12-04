@@ -37,7 +37,7 @@ pub struct Task {
 fn first_restore_trap() {
     let ctx = || {
         let mut mgr = TASK_MANAGER.lock();
-        let cur_idx = mgr.get_current_idx();
+        let cur_idx = kernel_stack::KernelStack::get_idx();
         let task = mgr.get_task_mut(cur_idx).unwrap();
         task.load_code().unwrap();
         let ctx = task.kernel_stack.get_trap_context();
@@ -98,6 +98,10 @@ impl Task {
 
     pub fn get_trap_context(&self) -> &'static trap::TrapContext {
         self.kernel_stack.get_trap_context()
+    }
+
+    pub fn get_trap_context_mut(&mut self) -> &'static mut trap::TrapContext {
+        self.kernel_stack.get_trap_context_mut()
     }
 
     pub fn set_state(&mut self, state: TaskState) {

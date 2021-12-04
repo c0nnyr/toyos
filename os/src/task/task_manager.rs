@@ -10,7 +10,6 @@ pub const USER_STACK_SIZE: usize = 4096;
 
 pub struct TaskManager {
     tasks: [Option<task::Task>; MAX_TASK_NUM],
-    current_idx: usize, // 记录当前运行的TASK
 }
 
 impl TaskManager {
@@ -35,40 +34,10 @@ impl TaskManager {
         }
     }
 
-    //Rust里面的错误，本质上也是个泛型枚举。这里我们的()是数据的类型，静态生命周期字符串引用&'static str（也就是字符串常量）是错误的类型
-    fn load_task_code(&mut self, idx: usize) -> Result<(), &'static str> {
-        if idx >= MAX_TASK_NUM {
-            return Err("idx exceed max task num");
-        }
-        match &mut self.tasks[idx] {
-            //避免拷贝，所以才加上个&
-            Some(task) => {
-                kinfo!(
-                    "==============================LoadingTask {} at {:?}.",
-                    idx,
-                    time::get_now()
-                );
-                task.load_code()?;
-                Ok(())
-            }
-            None => Err("no task to load"),
-        }
-    }
-
-    pub fn switch_to_task(&mut self, idx: usize) -> Result<(), &'static str> {
-        //这个“？”是Rust的语法糖，如果是Err就直接原样Return了。适用于透传Err的那些场景。
-        //相当于match self.load_task_code(idx){Err(err)=>{return err;},Ok(v)=>{xx}}
-        //这样写可以降低圈复杂度，减少代码量
-        self.load_task_code(idx)?;
-        self.current_idx = idx;
-        self.set_current_state(task::TaskState::Running);
-        Ok(())
-    }
-
-    pub fn switch_to_next_task(&mut self, from_idx: usize) -> Result<(), &'static str> {
+    pub fn switch_to_next_task(&mut self, from_idx: usize) -> Result<usize, &'static str> {
         for i in 0..MAX_TASK_NUM {
             let idx = (i + from_idx) % MAX_TASK_NUM; //循环一圈
-            match &self.tasks[idx] {
+            match &mut self.tasks[idx] {
                 Some(task) => {
                     if task.is_runnable() {
                         kinfo!(
@@ -76,9 +45,9 @@ impl TaskManager {
                             idx,
                             time::get_now()
                         );
-                        self.current_idx = idx;
-                        self.set_current_state(task::TaskState::Running);
-                        return Ok(());
+                        task.load_code()?;
+                        task.set_state(task::TaskState::Running);
+                        return Ok(idx);
                     }
                 }
                 None => (),
@@ -87,33 +56,11 @@ impl TaskManager {
         Err("no more task")
     }
 
-    pub fn get_current_idx(&self) -> usize {
-        self.current_idx
-    }
-
-    pub fn get_current_trap_context(&self) -> &'static trap::TrapContext {
-        match &self.tasks[self.current_idx] {
-            Some(task) => task.get_trap_context(),
-            None => panic!("never here"),
-        }
-    }
-
-    pub fn get_current_trap_context_mut(&mut self) -> &'static mut trap::TrapContext {
-        match &mut self.tasks[self.current_idx] {
-            Some(task) => task.kernel_stack.get_trap_context_mut(),
-            None => panic!("never here"),
-        }
-    }
-
     pub fn get_task_mut(&mut self, idx: usize) -> Option<&mut task::Task> {
         (&mut self.tasks[idx]).as_mut()
     }
-
-    pub fn set_current_state(&mut self, state: task::TaskState) {
-        match &mut self.tasks[self.current_idx] {
-            Some(task) => task.set_state(state),
-            None => panic!("never here"),
-        }
+    pub fn get_task(&self, idx: usize) -> Option<&task::Task> {
+        (&self.tasks[idx]).as_ref()
     }
 }
 
@@ -127,7 +74,6 @@ pub static TASK_MANAGER: spin::Mutex<TaskManager> = spin::Mutex::new(TaskManager
         None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
         None, None, None, None, None, None, None, None, None, None,
     ],
-    current_idx: 0,
 });
 
 pub fn init() {

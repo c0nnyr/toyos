@@ -1,5 +1,6 @@
 use crate::arch::ecall;
 use crate::arch::syscall;
+use crate::task::kernel_stack;
 use crate::task::task;
 use crate::task::task_manager;
 
@@ -45,6 +46,7 @@ pub trait TrapContextStore: Default {
     fn set_page_table_root_ppn(&mut self, root: u64, is_user: bool);
     fn set_trap_handler(&mut self, handler: u64);
     fn get_task_context_mut(&mut self) -> &mut switch::TaskContext;
+    fn get_task_context(&self) -> &switch::TaskContext;
 }
 
 pub struct TrapContext {
@@ -54,6 +56,9 @@ pub struct TrapContext {
 impl TrapContextStore for TrapContext {
     fn get_task_context_mut(&mut self) -> &mut switch::TaskContext {
         self.store.get_task_context_mut()
+    }
+    fn get_task_context(&self) -> &switch::TaskContext {
+        self.store.get_task_context()
     }
     fn set_page_table_root_ppn(&mut self, root: u64, is_user: bool) {
         self.store.set_page_table_root_ppn(root, is_user)
@@ -93,22 +98,16 @@ pub fn init() {
     trap::init();
 }
 
-fn schedule() {
+fn schedule(cur_trap_ctx: &'static TrapContext) {
     let mut task_manager = task_manager::TASK_MANAGER.lock();
-    let current_idx = task_manager.get_current_idx();
-    let last_task_ctx = task_manager
-        .get_current_trap_context_mut()
-        .get_task_context_mut();
+    let current_idx = kernel_stack::KernelStack::get_idx();
     match task_manager.switch_to_next_task(current_idx + 1) {
-        Ok(_) => {
-            let next_task_ctx = task_manager
-                .get_current_trap_context_mut()
-                .get_task_context_mut();
-            drop(task_manager);
-            let tmp = current_idx * 100;
-            kinfo!("in flow {} before {}", current_idx, tmp);
-            last_task_ctx.switch_to(next_task_ctx);
-            kinfo!("in flow {} after {}", current_idx, tmp);
+        Ok(idx) => {
+            let next_trap_ctx = task_manager.get_task(idx).unwrap().get_trap_context();
+            drop(task_manager); //否则切走了
+            cur_trap_ctx
+                .get_task_context()
+                .switch_to(next_trap_ctx.get_task_context());
         }
         Err(_) => {
             kinfo!("Legacy shutdown now!"); //没有更多应用了
@@ -119,9 +118,14 @@ fn schedule() {
 
 #[no_mangle]
 pub fn trap_entry(ctx: &'static mut TrapContext) -> &'static TrapContext {
+    let current_idx = kernel_stack::KernelStack::get_idx();
     let cause = TrapCause::get_current_cause();
     let set_current_task_state = |state: task::TaskState| {
-        task_manager::TASK_MANAGER.lock().set_current_state(state);
+        task_manager::TASK_MANAGER
+            .lock()
+            .get_task_mut(current_idx)
+            .unwrap()
+            .set_state(state);
     };
     match cause {
         TrapCause::Exeption(v) => match v {
@@ -131,16 +135,16 @@ pub fn trap_entry(ctx: &'static mut TrapContext) -> &'static TrapContext {
                     syscall::SyscallId::Exit => {
                         kinfo!("Task exiting.");
                         set_current_task_state(task::TaskState::Stopped);
-                        schedule()
+                        schedule(ctx)
                     }
                     syscall::SyscallId::Unsupported(v) => {
                         kerror!("Unsupported syscall {}.", v);
                         set_current_task_state(task::TaskState::Stopped);
-                        schedule()
+                        schedule(ctx)
                     }
                     syscall::SyscallId::Reschedule => {
                         ctx.mv_pc_to_next();
-                        schedule()
+                        schedule(ctx)
                     }
                     _ => {
                         let return_code = syscall_param.dispatch_syscall();
@@ -152,19 +156,19 @@ pub fn trap_entry(ctx: &'static mut TrapContext) -> &'static TrapContext {
             Exception::Unsupported(v) => {
                 kerror!("Unsupported trap exception {:?}", v);
                 set_current_task_state(task::TaskState::Stopped);
-                schedule()
+                schedule(ctx)
             }
         },
         TrapCause::Interrupt(v) => match v {
             Interrupt::Timer => {
                 kinfo!("Timer at {:?}", super::time::get_now());
                 super::time::set_next_timer(core::time::Duration::from_millis(500));
-                schedule()
+                schedule(ctx)
             }
             Interrupt::Unsupported(v) => {
                 kerror!("Unsupported trap interrupt {:?}", v);
                 set_current_task_state(task::TaskState::Stopped);
-                schedule()
+                schedule(ctx)
             }
         },
     }
